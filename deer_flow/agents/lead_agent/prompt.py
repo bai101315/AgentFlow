@@ -633,6 +633,51 @@ def get_deferred_tools_prompt_section() -> str:
     names = "\n".join(e.name for e in registry.entries)
     return f"<available-deferred-tools>\n{names}\n</available-deferred-tools>"
 
+def _build_acp_section() -> str:
+    """Build the ACP agent prompt section, only if ACP agents are configured."""
+    try:
+        from config.acp_config import get_acp_agents
+
+        agents = get_acp_agents()
+        if not agents:
+            return ""
+    except Exception:
+        return ""
+    
+    # ACP代理任务：不需要引用路径，会在它自己的路径下使用
+    # 要将 ACP 输出提供给用户，请将文件从 `/mnt/acp-workspace/<file>` 复制到 `/mnt/user-data/outputs/<file>
+    
+    return (
+        "\n**ACP Agent Tasks (invoke_acp_agent):**\n"
+        "- ACP agents (e.g. codex, claude_code) run in their own independent workspace — NOT in `/mnt/user-data/`\n"
+        "- When writing prompts for ACP agents, describe the task only — do NOT reference `/mnt/user-data` paths\n"
+        "- ACP agent results are accessible at `/mnt/acp-workspace/` (read-only) — use `ls`, `read_file`, or `bash cp` to retrieve output files\n"
+        "- To deliver ACP output to the user: copy from `/mnt/acp-workspace/<file>` to `/mnt/user-data/outputs/<file>`, then use `present_file`"
+    )
+
+def _build_custom_mounts_section() -> str:
+    """Build a prompt section for explicitly configured sandbox mounts."""
+    try:
+        from config import get_app_config
+
+        # 读取沙箱的自定义挂载目录配置
+        mounts = get_app_config().sandbox.mounts or []
+    except Exception:
+        logger.exception("Failed to load configured sandbox mounts for the lead-agent prompt")
+        return ""
+    
+    if not mounts:
+        return ""
+    
+    lines = []
+    for mount in mounts:
+        access = "read-only" if mount.read_only else "read-write"
+        lines.append(f"- Custom mount: `{mount.container_path}` - Host directory mapped into the sandbox ({access})")
+    
+    mounts_list = "\n".join(lines)
+    return f"\n**Custom Mounted Directories:**\n{mounts_list}\n- If the user needs files outside `/mnt/user-data`, use these absolute container paths directly when they match the requested directory"
+
+
 def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagents: int = 3, *, agent_name: str | None = None, available_skills: set[str] | None = None) -> str:
     # Get memory context
     memory_context = _get_memory_context(agent_name)
@@ -675,9 +720,9 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
 
 
     # # Build ACP agent section only if ACP agents are configured
-    # acp_section = _build_acp_section()
-    # custom_mounts_section = _build_custom_mounts_section()
-    # acp_and_mounts_section = "\n".join(section for section in (acp_section, custom_mounts_section) if section)
+    acp_section = _build_acp_section()
+    custom_mounts_section = _build_custom_mounts_section()
+    acp_and_mounts_section = "\n".join(section for section in (acp_section, custom_mounts_section) if section)
 
     # Format the prompt with dynamic skills and memory
 
@@ -695,14 +740,14 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
 
     prompt = SYSTEM_PROMPT_TEMPLATE.format(
         agent_name=agent_name or "DeerFlow 2.0",
-        soul="",
+        # soul=get_agent_soul(agent_name),
         skills_section=skills_section,
         deferred_tools_section=deferred_tools_section,
         memory_context=memory_context,
         subagent_section=subagent_section,
         subagent_reminder=subagent_reminder,
         subagent_thinking=subagent_thinking,
-        acp_section="",
+        acp_section=acp_and_mounts_section,
     )
 
     # print(f"prompt: {prompt}")

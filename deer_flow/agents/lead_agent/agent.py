@@ -24,9 +24,6 @@ from models import create_chat_model
 
 logger = logging.getLogger(__name__)
 
-
-
-
 def _create_summarization_middleware() -> SummarizationMiddleware | None:
     """Create and configure the summarization middleware from config."""
     config = get_summarization_config()
@@ -301,5 +298,6 @@ def make_lead_agent(config: RunnableConfig):
         system_prompt=apply_prompt_template(
             subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name, available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
         ),
+        state_schema=ThreadState
     )
 

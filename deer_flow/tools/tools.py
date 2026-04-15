@@ -62,14 +62,14 @@ def get_available_tools(
 
     # Do not expose host bash by default when LocalSandboxProvider is active.
     # 核心安全机制：当 LocalSandboxProvider 激活时，默认隐藏 host_bash 工具（防止恶意执行主机命令）
-    # if not is_host_bash_allowed(config):
-    #     tool_configs = [tool for tool in tool_configs if not _is_host_bash_tool(tool)]
+    if not is_host_bash_allowed(config):
+        tool_configs = [tool for tool in tool_configs if not _is_host_bash_tool(tool)]
 
     # tool.use：配置中定义的工具实现路径（如 deerflow.tools.web_search:WebSearchTool）
     # resolve_variable：反射加载工具类并实例化为 BaseTool 对象，完成「配置→工具实例」的转换
-
     # 根据config.yaml 加载工具deerflow.community.ddg_search.tools:web_search_tool,
     loaded_tools = [resolve_variable(tool.use, BaseTool) for tool in tool_configs]
+    
     # loaded_tools:[StructuredTool(name='web_search', description='Search the web for information. Use this tool to find current information, news, articles, and facts from the internet.', args_schema=<class 'langchain_core.utils.pydantic.web_search'>, func=<function web_search_tool at 0x000002810E587E20>)]
     # print(f"loaded_tools:{loaded_tools}")
 
