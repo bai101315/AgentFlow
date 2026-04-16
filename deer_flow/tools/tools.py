@@ -116,7 +116,7 @@ def get_available_tools(
     if include_mcp:
         try:
             from config.extensions_config import ExtensionsConfig
-            from mcp.cache import get_cached_mcp_tools
+            from deer_flow_mcp.cache import get_cached_mcp_tools
 
             # 从磁盘中读取最新的扩展配置，确保获取到最新的MCP服务器列表和工具状态
             extensions_config = ExtensionsConfig.from_file()

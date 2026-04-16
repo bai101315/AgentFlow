@@ -64,10 +64,10 @@ async def initialize_mcp_tools() -> list[BaseTool]:
             logger.info("MCP tools already initialized")
             return _mcp_tools_cache or []
         
-        from mcp.tools import get_mcp_tools
+        from deer_flow_mcp.tools import get_mcp_tools
         logger.info("Initializing MCP tools...")
         _mcp_tools_cache = await get_mcp_tools()
-        cache_initialized = True
+        _cache_initialized = True
         _config_mtime = _get_config_mtime()  # Record config file mtime
 
         logger.info(f"MCP tools initialized: {len(_mcp_tools_cache)} tool(s) loaded (config mtime: {_config_mtime})")
@@ -88,6 +88,7 @@ def get_cached_mcp_tools() -> list[BaseTool]:
     Returns:
         List of cached MCP tools.
     """
+    global _cache_initialized
 
     # Check if cache is stale due to config file changes
     if _is_cache_stale():
@@ -114,6 +115,7 @@ def get_cached_mcp_tools() -> list[BaseTool]:
             else:
                 # If no loop is running, we can use the current loop
                 loop.run_until_complete(initialize_mcp_tools())
+            logging.info(f"Successfully lazy initialization mcp")
         
         except RuntimeError:
             # No event loop exists, create one
@@ -121,6 +123,8 @@ def get_cached_mcp_tools() -> list[BaseTool]:
         except Exception as e:
             logger.error(f"Failed to lazy-initialize MCP tools: {e}")
             return []
+    
+    return _mcp_tools_cache or []
 
 
 

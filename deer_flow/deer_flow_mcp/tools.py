@@ -10,8 +10,8 @@ from typing import Any
 from langchain_core.tools import BaseTool
 
 from config.extensions_config import ExtensionsConfig
-from mcp.client import build_servers_config
-from mcp.oauth import build_oauth_tool_interceptor, get_initial_oauth_headers
+from deer_flow_mcp.client import build_servers_config
+from deer_flow_mcp.oauth import build_oauth_tool_interceptor, get_initial_oauth_headers
 
 logger = logging.getLogger(__name__)
 

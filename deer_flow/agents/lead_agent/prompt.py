@@ -740,7 +740,7 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
 
     prompt = SYSTEM_PROMPT_TEMPLATE.format(
         agent_name=agent_name or "DeerFlow 2.0",
-        # soul=get_agent_soul(agent_name),
+        soul="",
         skills_section=skills_section,
         deferred_tools_section=deferred_tools_section,
         memory_context=memory_context,
