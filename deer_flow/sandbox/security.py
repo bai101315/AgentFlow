@@ -1,6 +1,6 @@
 """Security helpers for sandbox capability gating."""
 
-from deerflow.config import get_app_config
+from config import get_app_config
 
 _LOCAL_SANDBOX_PROVIDER_MARKERS = (
     "deerflow.sandbox.local:LocalSandboxProvider",
