@@ -24,6 +24,22 @@ from models import create_chat_model
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_model_name(requested_model_name: str | None = None) -> str:
+    """Resolve a runtime model name safely, falling back to default if invalid. Returns None if no models are configured."""
+    app_config = get_app_config()
+    default_model_name = app_config.models[0].name if app_config.models else None
+    if default_model_name is None:
+        raise ValueError("No chat models are configured. Please configure at least one model in config.yaml.")
+    
+    if requested_model_name and app_config.get_model_config(requested_model_name):
+        return requested_model_name
+    
+    if requested_model_name and requested_model_name != default_model_name:
+        logger.warning(f"Model '{requested_model_name}' not found in config; fallback to default model '{default_model_name}'.")
+    return default_model_name
+
+
 def _create_summarization_middleware() -> SummarizationMiddleware | None:
     """Create and configure the summarization middleware from config."""
     config = get_summarization_config()
@@ -277,6 +293,46 @@ def make_lead_agent(config: RunnableConfig):
     agent_name = cfg.get("agent_name")
 
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None
+    # Custom agent model or fallback to global/default model resolution
+    agent_model_name = agent_config.model if agent_config and agent_config.model else _resolve_model_name()
+
+    # Final model name resolution with request override, then agent config, then global default
+    model_name = requested_model_name or agent_model_name
+
+    app_config = get_app_config()
+    model_config = app_config.get_model_config(model_name) if model_name else None
+
+    if model_config is None:
+        raise ValueError("No chat model could be resolved. Please configure at least one model in config.yaml or provide a valid 'model_name'/'model' in the request.")
+    if thinking_enabled and not model_config.supports_thinking:
+        logger.warning(f"Thinking mode is enabled but model '{model_name}' does not support it; fallback to non-thinking mode.")
+        thinking_enabled = False
+    
+    logger.info(
+        "Create Agent(%s) -> thinking_enabled: %s, reasoning_effort: %s, model_name: %s, is_plan_mode: %s, subagent_enabled: %s, max_concurrent_subagents: %s",
+        agent_name or "default",
+        thinking_enabled,
+        reasoning_effort,
+        model_name,
+        is_plan_mode,
+        subagent_enabled,
+        max_concurrent_subagents,
+    )
+
+    # Inject run metadata for LangSmith trace tagging
+    if "metadata" not in config:
+        config["metadata"] = {}
+
+    config["metadata"].update(
+        {
+            "agent_name": agent_name or "default",
+            "model_name": model_name or "default",
+            "thinking_enabled": thinking_enabled,
+            "reasoning_effort": reasoning_effort,
+            "is_plan_mode": is_plan_mode,
+            "subagent_enabled": subagent_enabled,
+        }
+    )
 
     # Warm skills cache before prompt rendering so first-turn skills_section is available.
     if not warm_enabled_skills_cache():
