@@ -630,6 +630,7 @@ dependencies = [
     { name = "langgraph-sdk" },
     { name = "lark-oapi" },
     { name = "markdown-to-mrkdwn" },
+    { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "python-telegram-bot" },
     { name = "slack-sdk" },
@@ -646,12 +647,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "deerflow-harness", editable = "deer-flow-study" },
+    { name = "deerflow-harness", editable = "deer_flow" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "langgraph-sdk", specifier = ">=0.1.51" },
     { name = "lark-oapi", specifier = ">=1.4.0" },
     { name = "markdown-to-mrkdwn", specifier = ">=0.3.1" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "python-telegram-bot", specifier = ">=21.0" },
     { name = "slack-sdk", specifier = ">=3.33.0" },
@@ -669,7 +671,7 @@ dev = [
 [[package]]
 name = "deerflow-harness"
 version = "0.1.0"
-source = { editable = "deer-flow-study" }
+source = { editable = "deer_flow" }
 dependencies = [
     { name = "agent-client-protocol" },
     { name = "agent-sandbox" },

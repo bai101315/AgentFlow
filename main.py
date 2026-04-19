@@ -1,20 +1,43 @@
 import asyncio
 import logging
 import sys
+from datetime import date
 from pathlib import Path
 from typing import TypedDict
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+LOG_DIR = Path(__file__).resolve().parent / "logs"
+
+
+def configure_logging() -> None:
+    """Configure logging to both console and daily log file."""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    daily_log_file = LOG_DIR / f"{date.today():%Y-%m-%d}.log"
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.handlers.clear()
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    file_handler = logging.FileHandler(daily_log_file, encoding="utf-8")
+    file_handler.setFormatter(formatter)
+
+    root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
+
+
+configure_logging()
 # Ensure local harness modules are importable when running from repo root.
 HARNESS_ROOT = Path(__file__).resolve().parent / "deer_flow"
 if str(HARNESS_ROOT) not in sys.path:
@@ -65,12 +88,13 @@ MAGENTA = "\033[35m"
 async def main():
     config = {
         "configurable":{
-            "thread_id": "debug-thread-001",
+            "thread_id": "leetcode_assis",
             "thinking_enabled": False,
             "is_plan_mode": True,
             "model_name": "minimax-m2.5",
             "subagent_enabled": True,
-            "tools_enabled": True
+            "tools_enabled": True,
+            "agent_name": "leetcode-assis",
         }
     }
     agent = make_lead_agent(config)

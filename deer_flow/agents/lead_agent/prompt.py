@@ -749,6 +749,6 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
         subagent_thinking=subagent_thinking,
         acp_section=acp_and_mounts_section,
     )
-
+    # logging.info(f"prompt: {prompt} + <current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>")
     # print(f"prompt: {prompt}")
     return prompt + f"\n<current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>"
