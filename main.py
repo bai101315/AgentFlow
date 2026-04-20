@@ -88,16 +88,14 @@ MAGENTA = "\033[35m"
 async def main():
     config = {
         "configurable":{
-            # "thread_id": "leetcode_assis",
-
-            "thread_id": "debug-thread-001",
-
+            "thread_id": "leetcode_assis",
+            # "thread_id": "debug-thread-001",
             "thinking_enabled": False,
             "is_plan_mode": True,
             "model_name": "minimax-m2.5",
             "subagent_enabled": True,
             "tools_enabled": True,
-            # "agent_name": "leetcode-assis",
+            "agent_name": "leetcode-assis",
         }
     }
     agent = make_lead_agent(config)

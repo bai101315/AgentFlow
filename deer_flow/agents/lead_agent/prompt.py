@@ -677,6 +677,12 @@ def _build_custom_mounts_section() -> str:
     mounts_list = "\n".join(lines)
     return f"\n**Custom Mounted Directories:**\n{mounts_list}\n- If the user needs files outside `/mnt/user-data`, use these absolute container paths directly when they match the requested directory"
 
+def get_agent_soul(agent_name: str | None) -> str:
+    # Append SOUL.md (agent personality) if present
+    soul = load_agent_soul(agent_name)
+    if soul:
+        return f"<soul>\n{soul}\n</soul>\n" if soul else ""
+    return ""
 
 def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagents: int = 3, *, agent_name: str | None = None, available_skills: set[str] | None = None) -> str:
     # Get memory context
@@ -715,14 +721,14 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
     # Get deferred tools section (tool_search) —— 获取延迟工具部分
     deferred_tools_section = get_deferred_tools_prompt_section()
 
-    # print(f"skills_section : {skills_section}")
-    # print(f"deferred_tools_section : {deferred_tools_section}")
-
-
-    # # Build ACP agent section only if ACP agents are configured
+    # Build ACP agent section only if ACP agents are configured
     acp_section = _build_acp_section()
     custom_mounts_section = _build_custom_mounts_section()
     acp_and_mounts_section = "\n".join(section for section in (acp_section, custom_mounts_section) if section)
+
+    logger.info(f"acp_section:{acp_section}")
+    logger.info(f"custom_mounts_section:{custom_mounts_section}")
+    logger.info(f"acp_and_mounts_section:{acp_and_mounts_section}")
 
     # Format the prompt with dynamic skills and memory
 
@@ -740,7 +746,7 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
 
     prompt = SYSTEM_PROMPT_TEMPLATE.format(
         agent_name=agent_name or "DeerFlow 2.0",
-        soul="",
+        soul=get_agent_soul(agent_name),
         skills_section=skills_section,
         deferred_tools_section=deferred_tools_section,
         memory_context=memory_context,
