@@ -96,10 +96,15 @@ async def main():
             "subagent_enabled": True,
             "tools_enabled": True,
             "agent_name": "leetcode-assis",
+            # "title_enabled": True,
+            
         }
     }
     agent = make_lead_agent(config)
-    
+
+    # graph = agent.get_graph()
+    # print(graph.draw_mermaid())
+
     # Get the memory queue for automatic memory updates
     memory_queue = get_memory_queue()
 

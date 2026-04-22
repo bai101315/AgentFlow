@@ -78,7 +78,7 @@ def _create_summarization_middleware() -> SummarizationMiddleware | None:
 
     if config.summary_prompt is not None:
         kwargs["summary_prompt"] = config.summary_prompt
-
+        
     return SummarizationMiddleware(**kwargs)
 
 
@@ -245,8 +245,8 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
 
     # Add ViewImageMiddleware only if the current model supports vision.
     # Use the resolved runtime model_name from make_lead_agent to avoid stale config values.
-    app_config = get_app_config()
-    model_config = app_config.get_model_config(model_name) if model_name else None
+    # app_config = get_app_config()
+    # model_config = app_config.get_model_config(model_name) if model_name else None
     # if model_config is not None and model_config.supports_vision:
         # middlewares.append(ViewImageMiddleware())
 

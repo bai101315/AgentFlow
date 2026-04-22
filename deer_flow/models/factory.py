@@ -130,23 +130,18 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             # Native langchain_anthropic: thinking is a direct constructor parameter
             model_settings_from_config["thinking"] = {"type": "disabled"}
 
-    # For Codex Responses API models: map thinking mode to reasoning_effort
-    # 针对 Codex 模型（OpenAI 代码模型）的专属适配 
-    # TODO：暂不考虑   
-    # from models.openai_codex_provider import CodexChatModel
+    # For reasoning-effort models (e.g. Responses API / Codex-style models), map thinking mode.
+    if model_config.supports_reasoning_effort:
+        # Some Responses API backends reject chat-completions style max_tokens.
+        model_settings_from_config.pop("max_tokens", None)
 
-    # if issubclass(model_class, CodexChatModel):
-    #     # The ChatGPT Codex endpoint currently rejects max_tokens/max_output_tokens.
-    #     model_settings_from_config.pop("max_tokens", None)
-
-    #     # Use explicit reasoning_effort from frontend if provided (low/medium/high)
-    #     explicit_effort = kwargs.pop("reasoning_effort", None)
-    #     if not thinking_enabled:
-    #         model_settings_from_config["reasoning_effort"] = "none"
-    #     elif explicit_effort and explicit_effort in ("low", "medium", "high", "xhigh"):
-    #         model_settings_from_config["reasoning_effort"] = explicit_effort
-    #     elif "reasoning_effort" not in model_settings_from_config:
-    #         model_settings_from_config["reasoning_effort"] = "medium"
+        explicit_effort = kwargs.pop("reasoning_effort", None)
+        if not thinking_enabled:
+            model_settings_from_config["reasoning_effort"] = "none"
+        elif explicit_effort in ("low", "medium", "high", "xhigh"):
+            model_settings_from_config["reasoning_effort"] = explicit_effort
+        elif "reasoning_effort" not in model_settings_from_config:
+            model_settings_from_config["reasoning_effort"] = "medium"
 
     # **kwargs（临时参数）优先级 > **model_settings_from_config（配置文件参数），支持动态覆盖
     model_instance = model_class(**kwargs, **model_settings_from_config)

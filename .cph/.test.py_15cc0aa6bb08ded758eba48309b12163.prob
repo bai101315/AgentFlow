@@ -1,0 +1,1 @@
+{"name":"Local: test","url":"c:\\Users\\BAI\\Desktop\\project\\test.py","tests":[{"id":1776754512930,"input":"10 20\n1 1 6 10 9 3 3 5 3 7","output":"3 5"}],"interactive":false,"memoryLimit":1024,"timeLimit":3000,"srcPath":"c:\\Users\\BAI\\Desktop\\project\\test.py","group":"local","local":true}

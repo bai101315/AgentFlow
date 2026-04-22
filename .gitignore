@@ -40,6 +40,7 @@ coverage/
 skills/custom/*
 logs/
 log/
+study_md/
 
 # Local git hooks (keep only on this machine, do not push)
 .githooks/
@@ -57,3 +58,4 @@ config.yaml.bak
 .playwright-mcp
 .gstack/
 .worktrees
+.png

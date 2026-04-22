@@ -81,11 +81,11 @@ def _build_runtime_middlewares(
     
     from agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware
     from agents.middlewares.thread_data_middleware import ThreadDataMiddleware
-    # from sandbox.middleware import SandboxMiddleware
+    from sandbox.middleware import SandboxMiddleware
     
     middlewares: list[AgentMiddleware] = [
         ThreadDataMiddleware(lazy_init=lazy_init),
-        # SandboxMiddleware(lazy_init=lazy_init),
+        SandboxMiddleware(lazy_init=lazy_init),
     ]
     
     if include_uploads:
@@ -93,10 +93,10 @@ def _build_runtime_middlewares(
 
         middlewares.insert(1, UploadsMiddleware())
     
-    # if include_dangling_tool_call_patch:
-    #     from agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
+    if include_dangling_tool_call_patch:
+        from agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
 
-    #     middlewares.append(DanglingToolCallMiddleware())
+        middlewares.append(DanglingToolCallMiddleware())
     
     middlewares.append(LLMErrorHandlingMiddleware())
 
@@ -127,9 +127,9 @@ def _build_runtime_middlewares(
     #             pass
     #     provider = provider_cls(**provider_kwargs)
     #     middlewares.append(GuardrailMiddleware(provider, fail_closed=guardrails_config.fail_closed, passport=guardrails_config.passport))
-    # from agents.middlewares.sandbox_audit_middleware import SandboxAuditMiddleware
+    from agents.middlewares.sandbox_audit_middleware import SandboxAuditMiddleware
 
-    # middlewares.append(SandboxAuditMiddleware())
+    middlewares.append(SandboxAuditMiddleware())
     middlewares.append(ToolErrorHandlingMiddleware())
 
     return middlewares
