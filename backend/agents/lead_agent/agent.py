@@ -4,7 +4,6 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, SummarizationMiddleware
 from langchain_core.runnables import RunnableConfig
 
-
 from agents.lead_agent.prompt import apply_prompt_template, warm_enabled_skills_cache
 from agents.middlewares.clarification_middleware import ClarificationMiddleware
 from agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
@@ -240,6 +239,7 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
     title_enabled = config.get("configurable", {}).get("title_enabled", False)
     if title_enabled:
         middlewares.append(TitleMiddleware())
+        
     # Add MemoryMiddleware (after TitleMiddleware)
     middlewares.append(MemoryMiddleware(agent_name=agent_name))
 

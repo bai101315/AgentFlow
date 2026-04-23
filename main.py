@@ -42,6 +42,9 @@ configure_logging()
 HARNESS_ROOT = Path(__file__).resolve().parent / "deer_flow"
 if str(HARNESS_ROOT) not in sys.path:
     sys.path.insert(0, str(HARNESS_ROOT))
+BACKEND_ROOT = Path(__file__).resolve().parent / "backend"
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 # Workaround for incompatible langgraph/langgraph-prebuilt builds where
 # langgraph.runtime does not expose ExecutionInfo/ServerInfo.
@@ -71,9 +74,9 @@ except Exception:
     # Keep startup resilient; downstream import errors will still surface.
     pass
 
-from deer_flow.agents.lead_agent.agent import make_lead_agent
-from deer_flow.agents.memory import get_memory_queue
-from deer_flow.agents.middlewares.memory_middleware import detect_correction, detect_reinforcement
+from backend.agents.lead_agent.agent import make_lead_agent
+from backend.agents.memory import get_memory_queue
+from backend.agents.middlewares.memory_middleware import detect_correction, detect_reinforcement
 
 CYAN = "\033[36m"
 GREEN = "\033[32m"

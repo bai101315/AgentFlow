@@ -17,7 +17,7 @@ __all__ = [
     # "Next",
     # "Prev",
     "make_lead_agent",
-    # "SandboxState",
+    "SandboxState",
     "ThreadState",
     # "get_checkpointer",
     # "reset_checkpointer",

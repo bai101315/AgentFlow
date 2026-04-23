@@ -136,7 +136,17 @@ def get_available_tools(
                     for t in mcp_tools:
                         registry.register(t)
                     # 把注册表设置为全局可用
-                    set_deferred_registry(registry)  
+                    set_deferred_registry(registry)
+                    
+                    # print("-" * 50)
+                    # print("📋 DeferredToolRegistry 全部内容：")
+                    # # 打印对象所有属性
+                    # print(f"注册表所有属性: {dir(registry)}")
+                    # # 打印内部字典/数据
+                    # if hasattr(registry, '_tools'):
+                    #     for tool in registry._tools.values():
+                    #         print(f"工具名: {tool.name}, 描述: {tool.description}")
+
                     builtin_tools.append(tool_search_tool)
                     logger.info(f"Tool search active: {len(mcp_tools)} tools deferred")
 

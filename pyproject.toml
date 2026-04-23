@@ -24,7 +24,7 @@ dependencies = [
 dev = ["pytest>=8.0.0", "ruff>=0.14.11"]
 
 [tool.uv.workspace]
-members = ["deer_flow"]
+members = ["backend"]
 
 [tool.uv.sources]
 deerflow-harness = { workspace = true }
