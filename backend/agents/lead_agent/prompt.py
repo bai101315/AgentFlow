@@ -726,7 +726,6 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
     # acp_section = _build_acp_section()
     # custom_mounts_section = _build_custom_mounts_section()
     # acp_and_mounts_section = "\n".join(section for section in (acp_section, custom_mounts_section) if section)
-
     # logger.info(f"acp_section:{acp_section}")
     # logger.info(f"custom_mounts_section:{custom_mounts_section}")
     # logger.info(f"acp_and_mounts_section:{acp_and_mounts_section}")

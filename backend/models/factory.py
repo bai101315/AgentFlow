@@ -73,8 +73,6 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
     # base_url='https://api.minimaxi.com/v1' request_timeout=600.0 max_retries=2 max_tokens=4096 temperature=1.0
     # use='langchain_openai:ChatOpenAI'
     
-    # print(f"model_config: {model_config}")
-    
     if model_config is None:
         raise ValueError(f"Model {name} not found in config") from None
 

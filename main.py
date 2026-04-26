@@ -8,85 +8,17 @@ from typing import TypedDict
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
+from until import *
+
 load_dotenv()
-
-LOG_DIR = Path(__file__).resolve().parent / "logs"
-
-
-def configure_logging() -> None:
-    """Configure logging to both console and daily log file."""
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    daily_log_file = LOG_DIR / f"{date.today():%Y-%m-%d}.log"
-
-    formatter = logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    root_logger.handlers.clear()
-
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-
-    file_handler = logging.FileHandler(daily_log_file, encoding="utf-8")
-    file_handler.setFormatter(formatter)
-
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
-
 
 configure_logging()
 # Ensure local harness modules are importable when running from repo root.
-HARNESS_ROOT = Path(__file__).resolve().parent / "deer_flow"
-if str(HARNESS_ROOT) not in sys.path:
-    sys.path.insert(0, str(HARNESS_ROOT))
 BACKEND_ROOT = Path(__file__).resolve().parent / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-# Workaround for incompatible langgraph/langgraph-prebuilt builds where
-# langgraph.runtime does not expose ExecutionInfo/ServerInfo.
-try:
-    import langgraph.runtime as _langgraph_runtime
-
-    if not hasattr(_langgraph_runtime, "ExecutionInfo"):
-        class _ExecutionInfo(TypedDict, total=False):
-            pass
-
-        _langgraph_runtime.ExecutionInfo = _ExecutionInfo  # type: ignore[attr-defined]
-
-    if not hasattr(_langgraph_runtime, "ServerInfo"):
-        class _ServerInfo(TypedDict, total=False):
-            pass
-
-        _langgraph_runtime.ServerInfo = _ServerInfo  # type: ignore[attr-defined]
-
-    runtime_cls = getattr(_langgraph_runtime, "Runtime", None)
-    if runtime_cls is not None:
-        # Some langgraph-prebuilt builds expect these attrs on Runtime instances.
-        if not hasattr(runtime_cls, "execution_info"):
-            setattr(runtime_cls, "execution_info", None)
-        if not hasattr(runtime_cls, "server_info"):
-            setattr(runtime_cls, "server_info", None)
-except Exception:
-    # Keep startup resilient; downstream import errors will still surface.
-    pass
-
 from backend.agents.lead_agent.agent import make_lead_agent
-from backend.agents.memory import get_memory_queue
-from backend.agents.middlewares.memory_middleware import detect_correction, detect_reinforcement
-
-CYAN = "\033[36m"
-GREEN = "\033[32m"
-YELLOW = "\033[33m"
-RED = "\033[31m"
-DIM = "\033[2m"
-RESET = "\033[0m"
-BOLD = "\033[1m"
-MAGENTA = "\033[35m"
-
 
 async def main():
     config = {
@@ -105,15 +37,12 @@ async def main():
     }
     agent = make_lead_agent(config)
 
+    # 打印agent的流程图
     # graph = agent.get_graph()
     # print(graph.draw_mermaid())
 
-    # Get the memory queue for automatic memory updates
-    memory_queue = get_memory_queue()
-
     while True:
         try:
-             
             user_input = input(f"{CYAN}{BOLD}You >> {RESET}")
             if not user_input:
                 continue
@@ -121,45 +50,14 @@ async def main():
                     print("Goodbye!")
                     break
             
-            # Invoke the agent
             state = {"messages": [HumanMessage(content=user_input)]}
             result = await agent.ainvoke(state, config=config, context={"thread_id": "debug-thread-001"})
 
-            # Print the response
             if result.get("messages"):
                 last_message = result["messages"][-1]
                 print(f"\n{GREEN}{BOLD}Agent{RESET}: {last_message.content}")
             
-            # ===== NEW: Queue memory update =====
-            # After agent completes, queue the conversation for memory update
-            messages = result.get("messages", [])
-            
-            # Detect signals
-            correction_detected = detect_correction(messages)
-            reinforcement_detected = detect_reinforcement(messages)
-            
-            # Add to memory queue (will be processed after debounce timeout)
-            thread_id = config["configurable"].get("thread_id", "default-thread")
-            memory_queue.add(
-                thread_id=thread_id,
-                messages=messages,
-                agent_name=None,  # global memory
-                correction_detected=correction_detected,
-                reinforcement_detected=reinforcement_detected,
-            )
-            
-            if correction_detected:
-                print(f"{YELLOW}[Memory] 检测到修正信号，将更新内存{RESET}")
-            elif reinforcement_detected:
-                print(f"{YELLOW}[Memory] 检测到正向反馈，将更新内存{RESET}")
-            else:
-                print(f"{DIM}[Memory] 对话已加入队列，将在30秒后处理{RESET}")
-            # ===== END: Memory queue integration =====
-
-        except KeyboardInterrupt:
-            print("\nInterrupted. Waiting for memory queue to finish...")
-            # Give the memory queue time to process pending updates
-            memory_queue.wait_for_processing(timeout=10)
+        except KeyboardInterrupt:     
             print("Goodbye!")
             break
         except Exception as e:

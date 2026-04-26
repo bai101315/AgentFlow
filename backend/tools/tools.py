@@ -96,7 +96,7 @@ def get_available_tools(
         model_name = config.models[0].name
     
     # Add view_image_tool only if the model supports vision
-    # NOTE: 不考虑
+    # NOTE: 不考虑视觉
     # model_config = config.get_model_config(model_name) if model_name else None
     # if model_config is not None and model_config.supports_vision:
     #     builtin_tools.append(view_image_tool)

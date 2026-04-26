@@ -243,6 +243,7 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
     # Add MemoryMiddleware (after TitleMiddleware)
     middlewares.append(MemoryMiddleware(agent_name=agent_name))
 
+    # NOTE: ?????
     # Add ViewImageMiddleware only if the current model supports vision.
     # Use the resolved runtime model_name from make_lead_agent to avoid stale config values.
     # app_config = get_app_config()
@@ -251,11 +252,12 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
         # middlewares.append(ViewImageMiddleware())
 
     # Add DeferredToolFilterMiddleware to hide deferred tool schemas from model binding
-    # if app_config.tool_search.enabled:
-    #     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
+    app_config = get_app_config()
+    if app_config.tool_search.enabled:
+        from agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
+        middlewares.append(DeferredToolFilterMiddleware())
 
-    #     middlewares.append(DeferredToolFilterMiddleware())
-
+    # ???????????????
     # Add SubagentLimitMiddleware to truncate excess parallel task calls
     # subagent_enabled = config.get("configurable", {}).get("subagent_enabled", False)
     # if subagent_enabled:
@@ -272,8 +274,6 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
     # ClarificationMiddleware should always be last
     middlewares.append(ClarificationMiddleware())
     return middlewares
-
-
 
 def make_lead_agent(config: RunnableConfig):
     # Lazy import to avoid circular dependency
@@ -340,14 +340,9 @@ def make_lead_agent(config: RunnableConfig):
     if not warm_enabled_skills_cache():
         logger.warning("Skills cache warm-up timed out; skills_section may be empty on first turn")
 
-    if tools_enabled:
-        tools = get_available_tools(model_name=requested_model_name, subagent_enabled=subagent_enabled) + [setup_agent]
-    else:
-        tools = []
-
     return create_agent(
-        model=create_chat_model(name=requested_model_name, thinking_enabled=thinking_enabled),
-        tools=tools,
+        model=create_chat_model(name=requested_model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
+        tools=get_available_tools(model_name=requested_model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
         middleware=_build_middlewares(config, model_name=requested_model_name, agent_name=agent_name),
         system_prompt=apply_prompt_template(
             subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name, available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
