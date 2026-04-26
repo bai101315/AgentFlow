@@ -59,11 +59,11 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
 
     Args:
         name: The name of the model to create. If None, the first model in the config will be used.
-        通用的聊天模型工厂函数，核心目标：基于配置驱动动态创建符合 LangChain 规范的聊天模型实例
     Returns:
         A chat model instance.
-        BaseChatModel（LangChain 所有聊天模型的抽象基类），保证多模型接口统一
     """
+    # 通用的聊天模型工厂函数，核心目标：基于配置驱动动态创建符合 LangChain 规范的聊天模型实例
+    # BaseChatModel（LangChain 所有聊天模型的抽象基类），保证多模型接口统一
     config = get_app_config()
     if name is None:
         name = config.models[0].name
@@ -95,7 +95,6 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
     )
     # Compute effective when_thinking_enabled by merging in the `thinking` shortcut field.
     # The `thinking` shortcut is equivalent to setting when_thinking_enabled["thinking"].
-
     # 合并「深度思考模式」的配置.（when_thinking_enabled 是完整配置，thinking 是快捷配置）
 
     has_thinking_settings = (model_config.when_thinking_enabled is not None) or (model_config.thinking is not None)
@@ -119,7 +118,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
                 {"thinking": {"type": "disabled"}},
             )
             model_settings_from_config["reasoning_effort"] = "minimal"
-        # TODO: 暂不考虑
+        # NOTE: 暂不考虑视觉
         # elif disable_chat_template_kwargs := _vllm_disable_chat_template_kwargs(effective_wte.get("extra_body", {}).get("chat_template_kwargs") or {}):
         #     # vLLM uses chat template kwargs to switch thinking on/off.
         #     model_settings_from_config["extra_body"] = _deep_merge_dicts(

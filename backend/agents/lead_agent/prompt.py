@@ -721,28 +721,17 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
     # Get deferred tools section (tool_search) —— 获取延迟工具部分
     deferred_tools_section = get_deferred_tools_prompt_section()
 
+    # NOTE：不考虑ACP
     # Build ACP agent section only if ACP agents are configured
-    acp_section = _build_acp_section()
-    custom_mounts_section = _build_custom_mounts_section()
-    acp_and_mounts_section = "\n".join(section for section in (acp_section, custom_mounts_section) if section)
+    # acp_section = _build_acp_section()
+    # custom_mounts_section = _build_custom_mounts_section()
+    # acp_and_mounts_section = "\n".join(section for section in (acp_section, custom_mounts_section) if section)
 
-    logger.info(f"acp_section:{acp_section}")
-    logger.info(f"custom_mounts_section:{custom_mounts_section}")
-    logger.info(f"acp_and_mounts_section:{acp_and_mounts_section}")
+    # logger.info(f"acp_section:{acp_section}")
+    # logger.info(f"custom_mounts_section:{custom_mounts_section}")
+    # logger.info(f"acp_and_mounts_section:{acp_and_mounts_section}")
 
     # Format the prompt with dynamic skills and memory
-
-    # prompt = SYSTEM_PROMPT_TEMPLATE.format(
-    #     agent_name=agent_name or "DeerFlow 2.0",
-    #     soul=get_agent_soul(agent_name),
-    #     skills_section=skills_section,
-    #     deferred_tools_section=deferred_tools_section,
-    #     memory_context=memory_context,
-    #     subagent_section=subagent_section,
-    #     subagent_reminder=subagent_reminder,
-    #     subagent_thinking=subagent_thinking,
-    #     acp_section=acp_and_mounts_section,
-    # )
 
     prompt = SYSTEM_PROMPT_TEMPLATE.format(
         agent_name=agent_name or "DeerFlow 2.0",
@@ -753,8 +742,7 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
         subagent_section=subagent_section,
         subagent_reminder=subagent_reminder,
         subagent_thinking=subagent_thinking,
-        acp_section=acp_and_mounts_section,
+        acp_section=""
     )
-    # logging.info(f"prompt: {prompt} + <current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>")
-    # print(f"prompt: {prompt}")
+
     return prompt + f"\n<current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>"

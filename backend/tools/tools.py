@@ -155,20 +155,21 @@ def get_available_tools(
         except Exception as e:
             logger.error(f"Failed to get cached MCP tools: {e}")
 
+    # NOTE: 不考虑ACP；
     # Add invoke_acp_agent tool if any ACP agents are configured
-    # 加载ACP：ACP（Agent-to-Agent Protocol）, 谷歌定义的agent间通信协议 
+    # Agent Client Protocol（ACP，智能体客户端协议）
     acp_tools: list[BaseTool] = []
-    try:
-        from config.acp_config import get_acp_agents
-        from tools.builtins.invoke_acp_agent_tool import build_invoke_acp_agent_tool
+    # try:
+    #     from config.acp_config import get_acp_agents
+    #     from tools.builtins.invoke_acp_agent_tool import build_invoke_acp_agent_tool
         
-        acp_agents = get_acp_agents()
-        if acp_agents:
-            acp_tools.append(build_invoke_acp_agent_tool(acp_agents))
-            logger.info(f"Including invoke_acp_agent tool ({len(acp_agents)} agent(s): {list(acp_agents.keys())})")
+    #     acp_agents = get_acp_agents()
+    #     if acp_agents:
+    #         acp_tools.append(build_invoke_acp_agent_tool(acp_agents))
+    #         logger.info(f"Including invoke_acp_agent tool ({len(acp_agents)} agent(s): {list(acp_agents.keys())})")
     
-    except Exception as e:
-        logger.warning(f"Failed to load ACP tool: {e}")
+    # except Exception as e:
+    #     logger.warning(f"Failed to load ACP tool: {e}")
 
     logger.info(f"Total tools loaded: {len(loaded_tools)}, built-in tools: {len(builtin_tools)}, MCP tools: {len(mcp_tools)}, ACP tools: {len(acp_tools)}")
     

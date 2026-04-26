@@ -331,16 +331,14 @@ def make_lead_agent(config: RunnableConfig):
             "reasoning_effort": reasoning_effort,
             "is_plan_mode": is_plan_mode,
             "subagent_enabled": subagent_enabled,
+            "tool_groups": agent_config.tool_groups if agent_config else None,
+            "available_skills": ["bootstrap"] if is_bootstrap else (agent_config.skills if agent_config and agent_config.skills is not None else None),
         }
     )
 
     # Warm skills cache before prompt rendering so first-turn skills_section is available.
     if not warm_enabled_skills_cache():
         logger.warning("Skills cache warm-up timed out; skills_section may be empty on first turn")
-
-    # registered_tools = get_available_tools(model_name=requested_model_name, subagent_enabled=False) + [setup_agent]
-    # tool_names = [getattr(tool, "name", type(tool).__name__) for tool in registered_tools]
-    # logger.info("Registered tools at startup (%d): %s", len(tool_names), ", ".join(tool_names))
 
     if tools_enabled:
         tools = get_available_tools(model_name=requested_model_name, subagent_enabled=subagent_enabled) + [setup_agent]
