@@ -13,6 +13,22 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 MAGENTA = "\033[35m"
 
+
+class ExcludeLoggerPrefixFilter(logging.Filter):
+    """Exclude records whose logger name matches configured prefixes."""
+
+    def __init__(self, prefixes: tuple[str, ...]):
+        super().__init__()
+        self._prefixes = prefixes
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        logger_name = record.name
+        for prefix in self._prefixes:
+            if logger_name == prefix or logger_name.startswith(f"{prefix}."):
+                return False
+        return True
+
+
 def configure_logging() -> None:
     """Configure logging to both console and daily log file."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -29,6 +45,9 @@ def configure_logging() -> None:
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(
+        ExcludeLoggerPrefixFilter(("agents.memory", "backend.agents.memory"))
+    )
 
     file_handler = logging.FileHandler(daily_log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)

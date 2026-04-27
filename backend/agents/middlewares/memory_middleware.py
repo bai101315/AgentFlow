@@ -173,8 +173,6 @@ def _filter_messages_for_memory(messages: list[Any]) -> list[Any]:
 
     return filtered
 
-
-
 # 继承 AgentState，仅作为类型兼容层，适配项目内 ThreadState 状态规范，无额外字段（中间件无需修改状态，仅读取）
 
 class MemoryMiddlewareState(AgentState):
@@ -206,7 +204,6 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
     @override
     def after_agent(self, state: MemoryMiddlewareState, runtime: Runtime) -> dict | None:
         """Queue conversation for memory update after agent completes.
-        核心钩子： agent执行完触发
         Args:
             state: The current agent state.
             runtime: The runtime context.
@@ -214,6 +211,7 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
         Returns:
             None (no state changes needed from this middleware).
         """
+        # 核心钩子： agent执行完触发
         # 1. 检查内存配置是否启用，未启用则跳过
         config = get_memory_config()
         if not config.enabled:

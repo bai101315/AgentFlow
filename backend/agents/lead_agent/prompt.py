@@ -736,7 +736,6 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
         agent_name=agent_name or "DeerFlow 2.0",
         soul=get_agent_soul(agent_name),
         skills_section=skills_section,
-        # skills_section="",
         deferred_tools_section=deferred_tools_section,
         memory_context=memory_context,
         subagent_section=subagent_section,

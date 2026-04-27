@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, SummarizationMiddleware
@@ -243,7 +243,7 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
     # Add MemoryMiddleware (after TitleMiddleware)
     middlewares.append(MemoryMiddleware(agent_name=agent_name))
 
-    # NOTE: ?????
+    # NOTE: no image
     # Add ViewImageMiddleware only if the current model supports vision.
     # Use the resolved runtime model_name from make_lead_agent to avoid stale config values.
     # app_config = get_app_config()
@@ -257,14 +257,14 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
         from agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
         middlewares.append(DeferredToolFilterMiddleware())
 
-    # ???????????????
+    # NOTE: NO SubagenLimit
     # Add SubagentLimitMiddleware to truncate excess parallel task calls
     # subagent_enabled = config.get("configurable", {}).get("subagent_enabled", False)
     # if subagent_enabled:
     #     max_concurrent_subagents = config.get("configurable", {}).get("max_concurrent_subagents", 3)
     #     middlewares.append(SubagentLimitMiddleware(max_concurrent=max_concurrent_subagents))
 
-    # LoopDetectionMiddleware �?detect and break repetitive tool call loops
+    # LoopDetectionMiddleware 鈥?detect and break repetitive tool call loops
     middlewares.append(LoopDetectionMiddleware())
 
     # Inject custom middlewares before ClarificationMiddleware
@@ -275,7 +275,7 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
     middlewares.append(ClarificationMiddleware())
     return middlewares
 
-def make_lead_agent(config: RunnableConfig):
+def make_lead_agent(config: RunnableConfig, checkpointer=None):
     # Lazy import to avoid circular dependency
     from tools import get_available_tools
     from tools.builtins import setup_agent
@@ -340,6 +340,7 @@ def make_lead_agent(config: RunnableConfig):
     if not warm_enabled_skills_cache():
         logger.warning("Skills cache warm-up timed out; skills_section may be empty on first turn")
 
+
     return create_agent(
         model=create_chat_model(name=requested_model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
         tools=get_available_tools(model_name=requested_model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
@@ -347,6 +348,7 @@ def make_lead_agent(config: RunnableConfig):
         system_prompt=apply_prompt_template(
             subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name, available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
         ),
+        checkpointer=checkpointer,
         state_schema=ThreadState
     )
 
