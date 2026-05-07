@@ -1,9 +1,12 @@
 import json
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from langchain.tools import tool
 from tavily import TavilyClient
 
 from config import get_app_config
+
+_TOOL_TIMEOUT_SECONDS = 60
 
 
 def _get_tavily_client() -> TavilyClient:
@@ -12,6 +15,18 @@ def _get_tavily_client() -> TavilyClient:
     if config is not None and "api_key" in config.model_extra:
         api_key = config.model_extra.get("api_key")
     return TavilyClient(api_key=api_key)
+
+
+def _run_with_timeout(fn):
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(fn)
+    try:
+        return future.result(timeout=_TOOL_TIMEOUT_SECONDS)
+    except TimeoutError as exc:
+        future.cancel()
+        raise TimeoutError(f"Tool call exceeded {_TOOL_TIMEOUT_SECONDS} seconds") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 @tool("web_search", parse_docstring=True)
@@ -27,7 +42,7 @@ def web_search_tool(query: str) -> str:
         max_results = config.model_extra.get("max_results")
 
     client = _get_tavily_client()
-    res = client.search(query, max_results=max_results)
+    res = _run_with_timeout(lambda: client.search(query, max_results=max_results))
     normalized_results = [
         {
             "title": result["title"],
@@ -52,7 +67,7 @@ def web_fetch_tool(url: str) -> str:
         url: The URL to fetch the contents of.
     """
     client = _get_tavily_client()
-    res = client.extract([url])
+    res = _run_with_timeout(lambda: client.extract([url]))
     if "failed_results" in res and len(res["failed_results"]) > 0:
         return f"Error: {res['failed_results'][0]['error']}"
     elif "results" in res and len(res["results"]) > 0:

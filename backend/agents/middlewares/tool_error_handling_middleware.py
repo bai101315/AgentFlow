@@ -18,14 +18,20 @@ _MISSING_TOOL_CALL_ID = "missing_tool_call_id"
 class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
     """Convert tool exceptions into error ToolMessages so the run can continue."""
 
-    def _build_error_message(self, request: ToolCallRequest, exc: Exception) -> ToolMessage:
+    retry_attempts: int = 1
+
+    def _build_error_message(self, request: ToolCallRequest, exc: Exception, attempts: int) -> ToolMessage:
         tool_name = str(request.tool_call.get("name") or "unknown_tool")
         tool_call_id = str(request.tool_call.get("id") or _MISSING_TOOL_CALL_ID)
         detail = str(exc).strip() or exc.__class__.__name__
         if len(detail) > 500:
             detail = detail[:497] + "..."
 
-        content = f"Error: Tool '{tool_name}' failed with {exc.__class__.__name__}: {detail}. Continue with available context, or choose an alternative tool."
+        content = (
+            f"Tool call failed: Tool '{tool_name}' failed after {attempts} attempt(s) "
+            f"with {exc.__class__.__name__}: {detail}. Explicitly tell the user that "
+            "the tool call failed, then continue only with available context or ask for the next step."
+        )
         return ToolMessage(
             content=content,
             tool_call_id=tool_call_id,
@@ -39,14 +45,23 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        try:
-            return handler(request)
-        except GraphBubbleUp:
-            # Preserve LangGraph control-flow signals (interrupt/pause/resume).
-            raise
-        except Exception as exc:
-            logger.exception("Tool execution failed (sync): name=%s id=%s", request.tool_call.get("name"), request.tool_call.get("id"))
-            return self._build_error_message(request, exc)
+        max_attempts = self.retry_attempts + 1
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return handler(request)
+            except GraphBubbleUp:
+                # Preserve LangGraph control-flow signals (interrupt/pause/resume).
+                raise
+            except Exception as exc:
+                logger.exception(
+                    "Tool execution failed (sync): name=%s id=%s attempt=%s/%s",
+                    request.tool_call.get("name"),
+                    request.tool_call.get("id"),
+                    attempt,
+                    max_attempts,
+                )
+                if attempt >= max_attempts:
+                    return self._build_error_message(request, exc, attempt)
 
     @override
     async def awrap_tool_call(
@@ -54,14 +69,23 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        try:
-            return await handler(request)
-        except GraphBubbleUp:
-            # Preserve LangGraph control-flow signals (interrupt/pause/resume).
-            raise
-        except Exception as exc:
-            logger.exception("Tool execution failed (async): name=%s id=%s", request.tool_call.get("name"), request.tool_call.get("id"))
-            return self._build_error_message(request, exc)
+        max_attempts = self.retry_attempts + 1
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return await handler(request)
+            except GraphBubbleUp:
+                # Preserve LangGraph control-flow signals (interrupt/pause/resume).
+                raise
+            except Exception as exc:
+                logger.exception(
+                    "Tool execution failed (async): name=%s id=%s attempt=%s/%s",
+                    request.tool_call.get("name"),
+                    request.tool_call.get("id"),
+                    attempt,
+                    max_attempts,
+                )
+                if attempt >= max_attempts:
+                    return self._build_error_message(request, exc, attempt)
 
 
 

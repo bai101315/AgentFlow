@@ -26,7 +26,6 @@ def _logging_level_from_config(name: str) -> int:
     mapping = logging.getLevelNamesMapping()
     return mapping.get((name or "info").strip().upper(), logging.INFO)
 
-
 def _setup_logging(log_level: str) -> None:
     """Send application logs to debug.log only (no console output)."""
     level = _logging_level_from_config(log_level)
@@ -79,7 +78,7 @@ async def main() -> None:
 
     config = {
         "configurable": {
-            "thread_id": "debug-thread-001",
+            "thread_id": "mock-interview-01",
             "thinking_enabled": False,
             "is_plan_mode": True,
             "model_name": "minimax-m2.5",
@@ -92,7 +91,9 @@ async def main() -> None:
     runtime = Runtime(context={"thread_id": thread_id})
     config["configurable"]["__pregel_runtime"] = runtime
 
-    session = PromptSession(history=InMemoryHistory()) if _HAS_PROMPT_TOOLKIT else None
+    # session = PromptSession(history=InMemoryHistory()) if _HAS_PROMPT_TOOLKIT else None
+    session = None
+
 
     async with make_checkpointer() as checkpointer:
         agent = make_lead_agent(config, checkpointer=checkpointer)
@@ -116,6 +117,14 @@ async def main() -> None:
                 if result.get("messages"):
                     last_message = result["messages"][-1]
                     print(f"\n{GREEN}{BOLD}Agent{RESET}: {last_message.content}")
+                
+                # 打印artifacts， 看看是什么东西？
+                # artifacts = result.get("artifacts")
+                # if artifacts:
+                #     print(f"{YELLOW}{BOLD}Artifacts{RESET}:")
+                #     for idx, artifact in enumerate(artifacts, 1):
+                #         print(f"  {idx}. {artifact}")
+
             except KeyboardInterrupt:
                 print("Goodbye!")
                 break
