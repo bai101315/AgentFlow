@@ -339,6 +339,22 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
     # Warm skills cache before prompt rendering so first-turn skills_section is available.
     if not warm_enabled_skills_cache():
         logger.warning("Skills cache warm-up timed out; skills_section may be empty on first turn")
+    
+    if is_bootstrap:
+        # Special bootstrap agent with minimal prompt for initial custom agent creation flow
+        tools = get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled) + [setup_agent]
+        return create_agent(
+            model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
+            tools=tools,
+            middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
+            system_prompt=apply_prompt_template(
+                subagent_enabled=subagent_enabled,
+                max_concurrent_subagents=max_concurrent_subagents,
+                available_skills=set(["bootstrap"]),
+            ),
+            checkpointer=checkpointer,
+            state_schema=ThreadState,
+        )
 
 
     return create_agent(
@@ -346,7 +362,10 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
         tools=get_available_tools(model_name=requested_model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
         middleware=_build_middlewares(config, model_name=requested_model_name, agent_name=agent_name),
         system_prompt=apply_prompt_template(
-            subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name, available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
+            subagent_enabled=subagent_enabled, 
+            max_concurrent_subagents=max_concurrent_subagents, 
+            agent_name=agent_name, 
+            available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
         ),
         checkpointer=checkpointer,
         state_schema=ThreadState

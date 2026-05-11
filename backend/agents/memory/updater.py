@@ -101,6 +101,43 @@ def _extract_text(content: Any) -> str:
     return str(content)
 
 
+def _strip_think_blocks(text: str) -> str:
+    """Remove model-emitted <think>...</think> blocks."""
+    return re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE).strip()
+
+
+def _extract_json_payload(text: str) -> dict[str, Any]:
+    """Parse a JSON object from model output with tolerant fallbacks."""
+    cleaned = _strip_think_blocks(text).strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if len(lines) >= 2:
+            if lines[-1].strip() == "```":
+                cleaned = "\n".join(lines[1:-1]).strip()
+            else:
+                cleaned = "\n".join(lines[1:]).strip()
+
+    try:
+        payload = json.loads(cleaned)
+        if isinstance(payload, dict):
+            return payload
+    except json.JSONDecodeError:
+        pass
+
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(cleaned):
+        if ch != "{":
+            continue
+        try:
+            payload, _ = decoder.raw_decode(cleaned[i:])
+            if isinstance(payload, dict):
+                return payload
+        except json.JSONDecodeError:
+            continue
+
+    raise json.JSONDecodeError("No JSON object found in model output", cleaned, 0)
+
+
 
 def _fact_content_key(content: Any) -> str | None:
     if not isinstance(content, str):
@@ -241,7 +278,7 @@ class MemoryUpdater:
 
             # print(f"====response_text {response_text}====")
 
-            update_data = json.loads(response_text)
+            update_data = _extract_json_payload(response_text)
 
             # Apply updates
             # 根据当前记忆和LLM返回的更新数据，生成新的记忆数据
@@ -257,7 +294,8 @@ class MemoryUpdater:
             return get_memory_storage().save(updated_memory, agent_name)
 
         except json.JSONDecodeError as e:
-            logger.warning("Failed to parse LLM response for memory update: %s", e)
+            preview = response_text[:300] if "response_text" in locals() else ""
+            logger.warning("Failed to parse LLM response for memory update: %s; preview=%r", e, preview)
             return False
         except Exception as e:
             logger.exception("Memory update failed: %s", e)
