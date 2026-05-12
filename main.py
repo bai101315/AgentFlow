@@ -77,6 +77,106 @@ def _prompt_line(label: str) -> str:
     return input(f"{CYAN}{BOLD}{label}{RESET}").strip()
 
 
+def _is_valid_url(url: str) -> bool:
+    lowered = (url or "").strip().lower()
+    return lowered.startswith("http://") or lowered.startswith("https://")
+
+
+_MODEL_PROVIDER_OPTIONS = (
+    {
+        "label": "MINIMAX",
+        "base_url": "https://api.minimaxi.com/v1",
+        "models": ("MiniMax-M2.5", "MiniMax-M2.7"),
+    },
+    {
+        "label": "Qwen",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "models": ("qwen3.5-flash", "qwen-plus", "qwen-max"),
+    },
+    {
+        "label": "DEEPSEEK",
+        "base_url": "https://api.deepseek.com/v1",
+        "models": ("deepseek-chat", "deepseek-reasoner"),
+    },
+    {
+        "label": "OpenAI Compatible",
+        "base_url": "",
+        "models": (),
+    },
+)
+
+
+def _choose_model_config() -> dict[str, str]:
+    from backend.config import get_app_config
+
+    app_config = get_app_config()
+    base_profiles = app_config.models or []
+    if not base_profiles:
+        raise ValueError("No models available in global config.yaml.")
+    base_profile = base_profiles[0].name
+
+    while True:
+        print("\nModel setup:")
+        for idx, option in enumerate(_MODEL_PROVIDER_OPTIONS, 1):
+            print(f"{idx}) {option['label']}")
+
+        selected = _prompt_line("Select model provider: ")
+        if not selected.isdigit():
+            print("Invalid selection.")
+            continue
+        idx = int(selected)
+        if idx < 1 or idx > len(_MODEL_PROVIDER_OPTIONS):
+            print("Selection out of range.")
+            continue
+
+        option = _MODEL_PROVIDER_OPTIONS[idx - 1]
+        default_base_url = option["base_url"]
+        provider_model = ""
+        models = option["models"]
+        print(f"\n{option['label']} models:")
+        if models:
+            for model_idx, model_name in enumerate(models, 1):
+                print(f"{model_idx}) {model_name}")
+            model_selected = _prompt_line("Select model: ")
+            if not model_selected.isdigit():
+                print("Invalid selection.")
+                continue
+            model_idx = int(model_selected)
+            if model_idx < 1 or model_idx > len(models):
+                print("Selection out of range.")
+                continue
+            provider_model = models[model_idx - 1]
+        else:
+            print("1) Custom model name")
+            custom_selected = _prompt_line("Select model: ")
+            if custom_selected != "1":
+                print("Invalid selection.")
+                continue
+            provider_model = _prompt_line("Provider model name: ")
+
+        base_url_prompt = f"Base URL [{default_base_url}]: " if default_base_url else "Base URL (http/https): "
+        api_key = _prompt_line("API key: ")
+        base_url = _prompt_line(base_url_prompt) or default_base_url
+        if not provider_model:
+            print("Provider model cannot be empty.")
+            continue
+        if not api_key:
+            print("API key cannot be empty.")
+            continue
+        if not _is_valid_url(base_url):
+            print("Invalid base URL. Must start with http:// or https://")
+            continue
+        if option["label"] == "DEEPSEEK" and "/anthropic" in base_url.lower():
+            print("Invalid DeepSeek base URL for this OpenAI-compatible profile. Use https://api.deepseek.com/v1")
+            continue
+        return {
+            "model": base_profile,
+            "provider_model": provider_model,
+            "api_key": api_key,
+            "base_url": base_url,
+        }
+
+
 def _print_main_menu(current_agent: str) -> None:
     print(f"\n{BOLD}=== Main Menu ==={RESET}")
     print("1) Enter Chat")
@@ -334,6 +434,7 @@ def _create_agent_interactive() -> str | None:
         return None
 
     description = _prompt_line("Agent function (one line): ")
+    model_config = _choose_model_config()
     paths = get_paths()
     agent_dir = paths.agent_dir(name)
     if agent_dir.exists():
@@ -341,7 +442,7 @@ def _create_agent_interactive() -> str | None:
         return None
 
     agent_dir.mkdir(parents=True, exist_ok=False)
-    config_data = {"name": name, "description": description}
+    config_data = {"name": name, "description": description, **model_config}
     config_file = agent_dir / "config.yaml"
     with open(config_file, "w", encoding="utf-8") as f:
         yaml.safe_dump(config_data, f, allow_unicode=True, sort_keys=False)
@@ -496,8 +597,6 @@ async def main() -> None:
         }
     }
 
-    # session = PromptSession(history=InMemoryHistory()) if _HAS_PROMPT_TOOLKIT else None
-    # session = None
 
     async with make_checkpointer() as checkpointer:
         current_agent = config["configurable"].get("agent_name", "test")

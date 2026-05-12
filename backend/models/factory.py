@@ -141,7 +141,8 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             model_settings_from_config["reasoning_effort"] = "medium"
 
     # **kwargs（临时参数）优先级 > **model_settings_from_config（配置文件参数），支持动态覆盖
-    model_instance = model_class(**kwargs, **model_settings_from_config)
+    model_settings = {**model_settings_from_config, **kwargs}
+    model_instance = model_class(**model_settings)
 
     # model_instance: client=<openai.resources.chat.completions.completions.Completions object at 0x000001CB72553200> async_client=<openai.resources.chat.completions.completions.AsyncCompletions object at 0x000001CB73C87380> root_client=<openai.OpenAI object at 0x000001CB7179E600> root_async_client=<openai.AsyncOpenAI object at 0x000001CB7284C8C0> model_name='qwen3.5-plus' temperature=0.7 model_kwargs={} openai_api_key=SecretStr('**********') openai_api_base='https://dashscope.aliyuncs.com/compatible-mode/v1' max_tokens=8192
     # print(f"model_instance: {model_instance}")

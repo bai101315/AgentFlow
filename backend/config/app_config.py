@@ -213,7 +213,8 @@ class AppConfig(BaseModel):
             if config.startswith("$"):
                 env_value = os.getenv(config[1:])
                 if env_value is None:
-                    raise ValueError(f"Environment variable {config[1:]} not found for config value {config}")
+                    logger.warning("Environment variable %s not found for config value %s; leaving placeholder unchanged", config[1:], config)
+                    return config
                 return env_value
             return config
         elif isinstance(config, dict):

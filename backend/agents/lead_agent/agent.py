@@ -293,14 +293,40 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
     agent_name = cfg.get("agent_name")
 
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None
+    has_agent_llm_overrides = bool(
+        agent_config
+        and (agent_config.api_key or agent_config.base_url or agent_config.provider_model)
+    )
+
     # Custom agent model or fallback to global/default model resolution
     agent_model_name = agent_config.model if agent_config and agent_config.model else _resolve_model_name()
 
-    # Final model name resolution with request override, then agent config, then global default
+    # Final model profile resolution with request override, then agent config, then global default
     model_name = requested_model_name or agent_model_name
 
     app_config = get_app_config()
     model_config = app_config.get_model_config(model_name) if model_name else None
+
+    # For custom per-agent provider config, allow fallback to default profile if name is unknown.
+    if model_config is None and has_agent_llm_overrides:
+        fallback_model = _resolve_model_name()
+        logger.warning(
+            "Agent '%s' model profile '%s' not found. Falling back to default profile '%s' for custom provider overrides.",
+            agent_name or "default",
+            model_name,
+            fallback_model,
+        )
+        model_name = fallback_model
+        model_config = app_config.get_model_config(model_name)
+
+    model_overrides: dict = {}
+    if agent_config:
+        if agent_config.provider_model:
+            model_overrides["model"] = agent_config.provider_model
+        if agent_config.api_key:
+            model_overrides["api_key"] = agent_config.api_key
+        if agent_config.base_url:
+            model_overrides["base_url"] = agent_config.base_url
 
     if model_config is None:
         raise ValueError("No chat model could be resolved. Please configure at least one model in config.yaml or provide a valid 'model_name'/'model' in the request.")
@@ -309,11 +335,13 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
         thinking_enabled = False
     
     logger.info(
-        "Create Agent(%s) -> thinking_enabled: %s, reasoning_effort: %s, model_name: %s, is_plan_mode: %s, subagent_enabled: %s, max_concurrent_subagents: %s",
+        "Create Agent(%s) -> thinking_enabled: %s, reasoning_effort: %s, model_name: %s, provider_model: %s, custom_endpoint: %s, is_plan_mode: %s, subagent_enabled: %s, max_concurrent_subagents: %s",
         agent_name or "default",
         thinking_enabled,
         reasoning_effort,
         model_name,
+        model_overrides.get("model"),
+        bool(model_overrides.get("base_url")),
         is_plan_mode,
         subagent_enabled,
         max_concurrent_subagents,
@@ -331,6 +359,8 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
             "reasoning_effort": reasoning_effort,
             "is_plan_mode": is_plan_mode,
             "subagent_enabled": subagent_enabled,
+            "provider_model": model_overrides.get("model"),
+            "provider_base_url": model_overrides.get("base_url"),
             "tool_groups": agent_config.tool_groups if agent_config else None,
             "available_skills": ["bootstrap"] if is_bootstrap else (agent_config.skills if agent_config and agent_config.skills is not None else None),
         }
@@ -344,7 +374,7 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
         # Special bootstrap agent with minimal prompt for initial custom agent creation flow
         tools = get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled) + [setup_agent]
         return create_agent(
-            model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
+            model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, **model_overrides),
             tools=tools,
             middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
             system_prompt=apply_prompt_template(
@@ -358,9 +388,9 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
 
 
     return create_agent(
-        model=create_chat_model(name=requested_model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
-        tools=get_available_tools(model_name=requested_model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
-        middleware=_build_middlewares(config, model_name=requested_model_name, agent_name=agent_name),
+        model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort, **model_overrides),
+        tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
+        middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
         system_prompt=apply_prompt_template(
             subagent_enabled=subagent_enabled, 
             max_concurrent_subagents=max_concurrent_subagents, 
