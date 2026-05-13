@@ -1,20 +1,32 @@
-# Agent_Base CLI
+# AgentFlow
 
-Agent_Base CLI is a local multi-agent command-line application built on LangGraph and LangChain. It supports custom agents with independent role definitions, model connections, session persistence, long-term memory, tools, and skills.
+AgentFlow is a local multi-agent orchestration and governance framework built on LangGraph and LangChain.
 
-The project is designed for local experimentation and extensible agent workflows, including research assistants, coding assistants, learning companions, daily report agents, and other task-specific AI agents.
+It focuses on runtime-level concerns that appear when multiple agents run in the same local environment: tool context control, middleware governance, memory persistence, session isolation, local sandbox execution, MCP tool integration, and customizable agent behavior.
+
+The goal is not only to provide a chat interface, but to provide a configurable Agent Runtime for building task-specific agents with independent role definitions, model connections, memory spaces, tool permissions, and skills.
+
+## Design Goals
+
+AgentFlow is designed around several runtime-level problems:
+
+- Prevent context pollution between multiple agents running in the same process.
+- Avoid exposing all tools to every agent by default.
+- Keep long-running conversations resumable through checkpointed session state.
+- Preserve useful long-term user and task context through per-agent memory.
+- Keep MCP and local tools controllable as the tool surface grows.
+- Provide a local execution model that is practical on Windows while still enforcing path and permission boundaries.
 
 ## Features
 
-- Multi-agent CLI management: create, delete, switch, and chat with custom agents.
-- Per-agent identity: each agent can have its own `SOUL.md` role and behavior definition.
-- Per-agent model configuration: provider model, API key, and base URL can be configured during creation.
-- Persistent sessions: each agent uses an independent thread ID and can continue previous conversations.
-- Long-term memory: each agent can maintain its own `memory.json`.
-- Tool system: configurable tool groups for web search, file access, file writing, and shell execution.
-- Skill system: load reusable skills from the local `skills/` directory.
-- MCP extension support: optional external tools can be configured through `extensions_config.json`.
-- SQLite checkpoint support for local state persistence.
+- Agent lifecycle management: create, delete, switch, and resume custom agents.
+- Runtime context isolation: each agent can maintain independent role definition, session thread, memory file, and workspace.
+- Agent-level model binding: configure provider model, API key, and base URL per agent.
+- Tool governance: expose tools by configurable groups such as web, file read, file write, and bash.
+- Deferred tool discovery: integrate MCP tools through a delayed `tool_search` mechanism to reduce prompt context overhead.
+- Middleware governance: support summarization, memory update, loop detection, clarification, and tool error handling.
+- Long-term memory and session persistence: combine per-agent memory with SQLite checkpointing.
+- Skill injection: load reusable skills from local public/custom skill directories.
 
 ## Tech Stack
 
@@ -28,7 +40,7 @@ The project is designed for local experimentation and extensible agent workflows
 - aiosqlite
 - uv
 
-The project uses a workspace-style Python setup. The root package is defined in `pyproject.toml`, with backend logic under `backend/`.
+The project uses a workspace-style Python setup. The root package is defined in `pyproject.toml`, with core runtime logic under `backend/`.
 
 ## Project Structure
 
@@ -51,8 +63,8 @@ Runtime data is stored under `.deer_flow/` by default. This directory may contai
 Clone the repository:
 
 ```bash
-git clone <your-repository-url>
-cd <your-repository-name>
+git@github.com:bai101315/LeetCode-Assistant.git
+cd LeetCode-Assistant
 ```
 
 Create and install the Python environment with `uv`:
