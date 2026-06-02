@@ -208,8 +208,7 @@ class MemoryUpdater:
     ) -> bool:
         
         """Update memory based on conversation messages.
-        根据对话消息更新内存
-
+        
         Args:
             messages: List of conversation messages.
             thread_id: Optional thread ID for tracking source.
@@ -220,6 +219,7 @@ class MemoryUpdater:
         Returns:
             True if update was successful, False otherwise.
         """
+        # 根据对话消息更新内存
         config = get_memory_config()
         if not config.enabled:
             return False

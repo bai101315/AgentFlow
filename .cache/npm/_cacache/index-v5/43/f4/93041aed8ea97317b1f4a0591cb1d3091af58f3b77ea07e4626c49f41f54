@@ -1,0 +1,2 @@
+
+35b784bc6465c1266193e4f1167e46e479014948	{"key":"make-fetch-happen:request-cache:http://registry.npm.taobao.org/web-streams-polyfill","integrity":null,"time":1780316928788,"size":"262","metadata":{"time":1780316928788,"url":"http://registry.npm.taobao.org/web-streams-polyfill","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Mon, 01 Jun 2026 12:28:48 GMT","location":"https://registry.npmmirror.com/web-streams-polyfill"},"options":{"compress":true},"status":301}}

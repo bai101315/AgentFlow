@@ -1,0 +1,2 @@
+
+64679bca5da98476516b0ddd6c21f24493c0b903	{"key":"make-fetch-happen:request-cache:http://registry.npm.taobao.org/es-object-atoms","integrity":null,"time":1780316928551,"size":"262","metadata":{"time":1780316928551,"url":"http://registry.npm.taobao.org/es-object-atoms","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Mon, 01 Jun 2026 12:28:48 GMT","location":"https://registry.npmmirror.com/es-object-atoms"},"options":{"compress":true},"status":301}}

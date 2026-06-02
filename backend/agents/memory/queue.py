@@ -28,10 +28,10 @@ class MemoryUpdateQueue:
     This queue collects conversation contexts and processes them after
     a configurable debounce period. Multiple conversations received within
     the debounce window are batched together.
-    用于内存更新的队列，具有防抖机制。
-    此队列收集会话上下文，并在一段可配置的防抖时间后处理。
-    防抖窗口内收到的多个会话将被批量处理。
     """
+    # 用于内存更新的队列，具有防抖机制。
+    # 此队列收集会话上下文，并在一段可配置的防抖时间后处理。
+    # 防抖窗口内收到的多个会话将被批量处理。
     def __init__(self):
         """Initialize the memory update queue."""
         self._queue: list[ConversationContext] = []
@@ -92,7 +92,7 @@ class MemoryUpdateQueue:
         """Reset the debounce timer."""
         config = get_memory_config()
         
-        # 说明已经村子啊一个计时器，需要重置
+        # 说明已经存在一个计时器，需要重置
         if self._timer is not None:
             self._timer.cancel()
         

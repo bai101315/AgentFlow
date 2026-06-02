@@ -1,0 +1,2 @@
+
+20d507aad21f7ecf777b9f714fb6f66e84d94c2c	{"key":"make-fetch-happen:request-cache:http://registry.npm.taobao.org/universal-user-agent","integrity":null,"time":1780316927649,"size":"262","metadata":{"time":1780316927649,"url":"http://registry.npm.taobao.org/universal-user-agent","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Mon, 01 Jun 2026 12:28:47 GMT","location":"https://registry.npmmirror.com/universal-user-agent"},"options":{"compress":true},"status":301}}

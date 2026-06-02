@@ -1,0 +1,2 @@
+
+380690bdacb3708e3fda342adabfc222fe42d613	{"key":"make-fetch-happen:request-cache:http://registry.npm.taobao.org/node-domexception","integrity":null,"time":1780316928790,"size":"262","metadata":{"time":1780316928790,"url":"http://registry.npm.taobao.org/node-domexception","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Mon, 01 Jun 2026 12:28:48 GMT","location":"https://registry.npmmirror.com/node-domexception"},"options":{"compress":true},"status":301}}

@@ -55,6 +55,11 @@ async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
             raise ImportError(SQLITE_INSTALL) from exc
 
         conn_str = resolve_sqlite_conn_str(config.connection_string or "store.db")
+        # conn_str:  
+        # C:\Users\BAI\Desktop\project\.deer_flow\checkpoints.db
+
+        # SQLite 在打开数据库文件时不会自动创建缺失的父目录，若目录不存在会直接报错。
+        # ensure_sqlite_parent_dir(conn_str) 是一个同步函数，负责从连接字符串中提取文件路径部分，然后创建所有缺失的父目录
         await asyncio.to_thread(ensure_sqlite_parent_dir, conn_str)
         async with AsyncSqliteSaver.from_conn_string(conn_str) as saver:
             await saver.setup()

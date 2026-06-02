@@ -1,0 +1,2 @@
+
+8a6229d86b1c8fd5408eff0b6e8ae109637ca0a7	{"key":"make-fetch-happen:request-cache:http://registry.npm.taobao.org/hasown","integrity":null,"time":1780316928235,"size":"262","metadata":{"time":1780316928235,"url":"http://registry.npm.taobao.org/hasown","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Mon, 01 Jun 2026 12:28:47 GMT","location":"https://registry.npmmirror.com/hasown"},"options":{"compress":true},"status":301}}

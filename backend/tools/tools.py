@@ -70,6 +70,8 @@ def get_available_tools(
     # 根据config.yaml 加载工具deerflow.community.ddg_search.tools:web_search_tool,
     loaded_tools = [resolve_variable(tool.use, BaseTool) for tool in tool_configs]
     
+   
+
     # loaded_tools:[StructuredTool(name='web_search', description='Search the web for information. Use this tool to find current information, news, articles, and facts from the internet.', args_schema=<class 'langchain_core.utils.pydantic.web_search'>, func=<function web_search_tool at 0x000002810E587E20>)]
     # print(f"loaded_tools:{loaded_tools}")
 
@@ -172,5 +174,18 @@ def get_available_tools(
     #     logger.warning(f"Failed to load ACP tool: {e}")
 
     logger.info(f"Total tools loaded: {len(loaded_tools)}, built-in tools: {len(builtin_tools)}, MCP tools: {len(mcp_tools)}, ACP tools: {len(acp_tools)}")
+    
+    tools_total = loaded_tools + builtin_tools + mcp_tools + acp_tools
+    # print(f"tools_total:{tools_total}")
+
+    # from pympler.asizeof import asizeof
+    # size = len(tools_total)
+    # tools_total_size = asizeof(tools_total)
+    # print("="*30)
+    # print(f"tools_total:{size}")
+    # print(f"工具列表总内存：{round(tools_total_size/1024, 2)} KB")
+    # print(tools_total[0])
+    # print("="*30)
+    
     
     return loaded_tools + builtin_tools + mcp_tools + acp_tools

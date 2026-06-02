@@ -111,10 +111,6 @@ def detect_correction(messages: list[Any]) -> bool:
 
 def _filter_messages_for_memory(messages: list[Any]) -> list[Any]:
     """Filter messages to keep only user inputs and final assistant responses.
-    仅保留「用户输入 + Agent 最终响应」，排除临时 / 中间信息，
-    过滤规则（跳过的内容）：Tool 消息（工具调用的中间结果）、tool_calls 的 AI 消息（Agent 中间步骤，非最终响应）
-    <uploaded_files> 块（临时文件上传信息
-    保留的内容：清理后的用户（human）消息（移除上传块后非空）；无tool_calls 的 AI 消息（Agent 最终响应）。
 
     This filters out:
     - Tool messages (intermediate tool call results)
@@ -136,6 +132,11 @@ def _filter_messages_for_memory(messages: list[Any]) -> list[Any]:
     Returns:
         Filtered list containing only user inputs and final assistant responses.
     """
+    # 仅保留「用户输入 + Agent 最终响应」，排除临时 / 中间信息，
+    # 过滤规则（跳过的内容）：Tool 消息（工具调用的中间结果）、tool_calls 的 AI 消息（Agent 中间步骤，非最终响应）
+    # <uploaded_files> 块（临时文件上传信息
+    # 保留的内容：清理后的用户（human）消息（移除上传块后非空）；无tool_calls 的 AI 消息（Agent 最终响应）。
+
     filtered = []
     skip_next_ai = False
     for msg in messages:
@@ -174,7 +175,6 @@ def _filter_messages_for_memory(messages: list[Any]) -> list[Any]:
     return filtered
 
 # 继承 AgentState，仅作为类型兼容层，适配项目内 ThreadState 状态规范，无额外字段（中间件无需修改状态，仅读取）
-
 class MemoryMiddlewareState(AgentState):
     """Compatible with the `ThreadState` schema."""
     pass

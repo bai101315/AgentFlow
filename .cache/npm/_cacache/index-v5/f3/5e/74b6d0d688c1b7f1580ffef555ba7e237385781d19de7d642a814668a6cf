@@ -1,0 +1,2 @@
+
+c1e7d5154eaa948c5009bdb8be83f42e1c468428	{"key":"make-fetch-happen:request-cache:http://registry.npm.taobao.org/fetch-blob","integrity":null,"time":1780316927991,"size":"262","metadata":{"time":1780316927991,"url":"http://registry.npm.taobao.org/fetch-blob","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Mon, 01 Jun 2026 12:28:47 GMT","location":"https://registry.npmmirror.com/fetch-blob"},"options":{"compress":true},"status":301}}

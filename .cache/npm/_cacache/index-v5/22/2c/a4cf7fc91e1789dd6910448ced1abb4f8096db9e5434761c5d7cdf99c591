@@ -1,0 +1,2 @@
+
+ba6e2bc616d113192bcfc0d2d21b328d2ed4a639	{"key":"make-fetch-happen:request-cache:http://registry.npm.taobao.org/formdata-polyfill","integrity":null,"time":1780316927990,"size":"262","metadata":{"time":1780316927990,"url":"http://registry.npm.taobao.org/formdata-polyfill","reqHeaders":{"accept":"application/json"},"resHeaders":{"content-type":"text/html","date":"Mon, 01 Jun 2026 12:28:47 GMT","location":"https://registry.npmmirror.com/formdata-polyfill"},"options":{"compress":true},"status":301}}

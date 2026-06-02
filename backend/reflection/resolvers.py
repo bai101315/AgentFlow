@@ -25,7 +25,6 @@ def resolve_variable[T](
     expected_type: type[T] | tuple[type, ...] | None = None,
 ) -> T:
     """Resolve a variable from a path.
-    有一个路径，里面有类、函数，那个这个变量然后验证，返回后可以直接使用
     Args:
         variable_path: The path to the variable (e.g. "parent_package_name.sub_package_name.module_name:variable_name").
         expected_type: Optional type or tuple of types to validate the resolved variable against.
@@ -38,6 +37,7 @@ def resolve_variable[T](
         ImportError: If the module path is invalid or the attribute doesn't exist.
         ValueError: If the resolved variable doesn't pass the validation checks.
     """
+    # 有一个路径，里面有类、函数，那个这个变量然后验证，返回后可以直接使用
     try:
         module_path, variable_name = variable_path.rsplit(":", 1)
     except ValueError as err:
