@@ -63,7 +63,7 @@ Runtime data is stored under `.deer_flow/` by default. This directory may contai
 Clone the repository:
 
 ```bash
-git@github.com:bai101315/LeetCode-Assistant.git
+git clone https://github.com/bai101315/LeetCode-Assistant.git
 cd LeetCode-Assistant
 ```
 
