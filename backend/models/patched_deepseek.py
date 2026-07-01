@@ -14,6 +14,15 @@ from langchain_core.messages import AIMessage
 from langchain_deepseek import ChatDeepSeek
 
 
+def _strip_cache_control(value: Any) -> Any:
+    """Remove Anthropic-style cache_control markers from DeepSeek payloads."""
+    if isinstance(value, dict):
+        return {key: _strip_cache_control(inner) for key, inner in value.items() if key != "cache_control"}
+    if isinstance(value, list):
+        return [_strip_cache_control(item) for item in value]
+    return value
+
+
 class PatchedChatDeepSeek(ChatDeepSeek):
     """ChatDeepSeek with proper reasoning_content preservation.
 
@@ -48,6 +57,7 @@ class PatchedChatDeepSeek(ChatDeepSeek):
 
         # Call parent to get the base payload
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
+        payload = _strip_cache_control(payload)
 
         # Match payload messages with original messages to restore reasoning_content
         payload_messages = payload.get("messages", [])
@@ -71,3 +81,35 @@ class PatchedChatDeepSeek(ChatDeepSeek):
                     payload_messages[idx]["reasoning_content"] = reasoning_content
 
         return payload
+
+    def _create_chat_result(self, response: dict | Any, generation_info: dict | None = None):
+        """Create chat result and surface DeepSeek cache usage metadata."""
+        result = super()._create_chat_result(response, generation_info=generation_info)
+
+        response_dict = response if isinstance(response, dict) else getattr(response, "model_dump", lambda: {})()
+        usage = response_dict.get("usage") if isinstance(response_dict, dict) else None
+        if not isinstance(usage, dict):
+            return result
+
+        cache_usage = {
+            key: usage.get(key)
+            for key in ("prompt_cache_hit_tokens", "prompt_cache_miss_tokens")
+            if usage.get(key) is not None
+        }
+        if not cache_usage:
+            return result
+
+        for generation in result.generations:
+            message = generation.message
+            if isinstance(message, AIMessage):
+                response_metadata = dict(message.response_metadata or {})
+                token_usage = dict(response_metadata.get("token_usage") or {})
+                token_usage.update(cache_usage)
+                response_metadata["token_usage"] = token_usage
+                message.response_metadata = response_metadata
+
+                usage_metadata = dict(message.usage_metadata or {})
+                usage_metadata.update(cache_usage)
+                message.usage_metadata = usage_metadata
+
+        return result

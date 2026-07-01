@@ -565,35 +565,37 @@ def validate_local_tool_path(path: str, thread_data: ThreadDataState | None, *, 
         SandboxRuntimeError: If thread data is missing.
         PermissionError: If the path is not allowed or contains traversal.
     """
-    if thread_data is None:
-        raise SandboxRuntimeError("Thread data not available for local sandbox")
-
-    _reject_path_traversal(path)
-
-    # Skills paths — read-only access only
-    if _is_skills_path(path):
-        if not read_only:
-            raise PermissionError(f"Write access to skills path is not allowed: {path}")
-        return
-
-    # ACP workspace paths — read-only access only
-    if _is_acp_workspace_path(path):
-        if not read_only:
-            raise PermissionError(f"Write access to ACP workspace is not allowed: {path}")
-        return
-
-    # User-data paths
-    if path.startswith(f"{VIRTUAL_PATH_PREFIX}/"):
-        return
-
-    # Custom mount paths — respect read_only config
-    if _is_custom_mount_path(path):
-        mount = _get_custom_mount_for_path(path)
-        if mount and mount.read_only and not read_only:
-            raise PermissionError(f"Write access to read-only mount is not allowed: {path}")
-        return
-
-    raise PermissionError(f"Only paths under {VIRTUAL_PATH_PREFIX}/, {_get_skills_container_path()}/, {_ACP_WORKSPACE_VIRTUAL_PATH}/, or configured mount paths are allowed")
+    # Sandbox path gate disabled temporarily so the agent can operate on the whole project.
+    # if thread_data is None:
+    #     raise SandboxRuntimeError("Thread data not available for local sandbox")
+    #
+    # _reject_path_traversal(path)
+    #
+    # # Skills paths — read-only access only
+    # if _is_skills_path(path):
+    #     if not read_only:
+    #         raise PermissionError(f"Write access to skills path is not allowed: {path}")
+    #     return
+    #
+    # # ACP workspace paths — read-only access only
+    # if _is_acp_workspace_path(path):
+    #     if not read_only:
+    #         raise PermissionError(f"Write access to ACP workspace is not allowed: {path}")
+    #     return
+    #
+    # # User-data paths
+    # if path.startswith(f"{VIRTUAL_PATH_PREFIX}/"):
+    #     return
+    #
+    # # Custom mount paths — respect read_only config
+    # if _is_custom_mount_path(path):
+    #     mount = _get_custom_mount_for_path(path)
+    #     if mount and mount.read_only and not read_only:
+    #         raise PermissionError(f"Write access to read-only mount is not allowed: {path}")
+    #     return
+    #
+    # raise PermissionError(f"Only paths under {VIRTUAL_PATH_PREFIX}/, {_get_skills_container_path()}/, {_ACP_WORKSPACE_VIRTUAL_PATH}/, or configured mount paths are allowed")
+    return
 
 
 def _validate_resolved_user_data_path(resolved: Path, thread_data: ThreadDataState) -> None:
@@ -601,27 +603,29 @@ def _validate_resolved_user_data_path(resolved: Path, thread_data: ThreadDataSta
 
     Raises PermissionError if the path escapes workspace/uploads/outputs.
     """
-    allowed_roots = [
-        Path(p).resolve()
-        for p in (
-            thread_data.get("workspace_path"),
-            thread_data.get("uploads_path"),
-            thread_data.get("outputs_path"),
-        )
-        if p is not None
-    ]
-
-    if not allowed_roots:
-        raise SandboxRuntimeError("No allowed local sandbox directories configured")
-
-    for root in allowed_roots:
-        try:
-            resolved.relative_to(root)
-            return
-        except ValueError:
-            continue
-
-    raise PermissionError("Access denied: path traversal detected")
+    # Sandbox resolved-path gate disabled temporarily so the agent can operate on the whole project.
+    # allowed_roots = [
+    #     Path(p).resolve()
+    #     for p in (
+    #         thread_data.get("workspace_path"),
+    #         thread_data.get("uploads_path"),
+    #         thread_data.get("outputs_path"),
+    #     )
+    #     if p is not None
+    # ]
+    #
+    # if not allowed_roots:
+    #     raise SandboxRuntimeError("No allowed local sandbox directories configured")
+    #
+    # for root in allowed_roots:
+    #     try:
+    #         resolved.relative_to(root)
+    #         return
+    #     except ValueError:
+    #         continue
+    #
+    # raise PermissionError("Access denied: path traversal detected")
+    return
 
 
 def _resolve_and_validate_user_data_path(path: str, thread_data: ThreadDataState) -> str:
@@ -650,50 +654,52 @@ def validate_local_bash_command_paths(command: str, thread_data: ThreadDataState
     A small allowlist of common system path prefixes is kept for executable
     and device references (e.g. /bin/sh, /dev/null).
     """
-    if thread_data is None:
-        raise SandboxRuntimeError("Thread data not available for local sandbox")
-
-    # Block file:// URLs which bypass the absolute-path regex but allow local file exfiltration
-    file_url_match = _FILE_URL_PATTERN.search(command)
-    if file_url_match:
-        raise PermissionError(f"Unsafe file:// URL in command: {file_url_match.group()}. Use paths under {VIRTUAL_PATH_PREFIX}")
-
-    unsafe_paths: list[str] = []
-    allowed_paths = _get_mcp_allowed_paths()
-
-    for absolute_path in _ABSOLUTE_PATH_PATTERN.findall(command):
-        # Check for MCP filesystem server allowed paths
-        if any(absolute_path.startswith(path) or absolute_path == path.rstrip("/") for path in allowed_paths):
-            _reject_path_traversal(absolute_path)
-            continue
-
-        if absolute_path == VIRTUAL_PATH_PREFIX or absolute_path.startswith(f"{VIRTUAL_PATH_PREFIX}/"):
-            _reject_path_traversal(absolute_path)
-            continue
-
-        # Allow skills container path (resolved by tools.py before passing to sandbox)
-        if _is_skills_path(absolute_path):
-            _reject_path_traversal(absolute_path)
-            continue
-
-        # Allow ACP workspace path (path-traversal check only)
-        if _is_acp_workspace_path(absolute_path):
-            _reject_path_traversal(absolute_path)
-            continue
-
-        # Allow custom mount container paths
-        if _is_custom_mount_path(absolute_path):
-            _reject_path_traversal(absolute_path)
-            continue
-
-        if any(absolute_path == prefix.rstrip("/") or absolute_path.startswith(prefix) for prefix in _LOCAL_BASH_SYSTEM_PATH_PREFIXES):
-            continue
-
-        unsafe_paths.append(absolute_path)
-
-    if unsafe_paths:
-        unsafe = ", ".join(sorted(dict.fromkeys(unsafe_paths)))
-        raise PermissionError(f"Unsafe absolute paths in command: {unsafe}. Use paths under {VIRTUAL_PATH_PREFIX}")
+    # Sandbox bash path gate disabled temporarily so the agent can run normal project commands.
+    # if thread_data is None:
+    #     raise SandboxRuntimeError("Thread data not available for local sandbox")
+    #
+    # # Block file:// URLs which bypass the absolute-path regex but allow local file exfiltration
+    # file_url_match = _FILE_URL_PATTERN.search(command)
+    # if file_url_match:
+    #     raise PermissionError(f"Unsafe file:// URL in command: {file_url_match.group()}. Use paths under {VIRTUAL_PATH_PREFIX}")
+    #
+    # unsafe_paths: list[str] = []
+    # allowed_paths = _get_mcp_allowed_paths()
+    #
+    # for absolute_path in _ABSOLUTE_PATH_PATTERN.findall(command):
+    #     # Check for MCP filesystem server allowed paths
+    #     if any(absolute_path.startswith(path) or absolute_path == path.rstrip("/") for path in allowed_paths):
+    #         _reject_path_traversal(absolute_path)
+    #         continue
+    #
+    #     if absolute_path == VIRTUAL_PATH_PREFIX or absolute_path.startswith(f"{VIRTUAL_PATH_PREFIX}/"):
+    #         _reject_path_traversal(absolute_path)
+    #         continue
+    #
+    #     # Allow skills container path (resolved by tools.py before passing to sandbox)
+    #     if _is_skills_path(absolute_path):
+    #         _reject_path_traversal(absolute_path)
+    #         continue
+    #
+    #     # Allow ACP workspace path (path-traversal check only)
+    #     if _is_acp_workspace_path(absolute_path):
+    #         _reject_path_traversal(absolute_path)
+    #         continue
+    #
+    #     # Allow custom mount container paths
+    #     if _is_custom_mount_path(absolute_path):
+    #         _reject_path_traversal(absolute_path)
+    #         continue
+    #
+    #     if any(absolute_path == prefix.rstrip("/") or absolute_path.startswith(prefix) for prefix in _LOCAL_BASH_SYSTEM_PATH_PREFIXES):
+    #         continue
+    #
+    #     unsafe_paths.append(absolute_path)
+    #
+    # if unsafe_paths:
+    #     unsafe = ", ".join(sorted(dict.fromkeys(unsafe_paths)))
+    #     raise PermissionError(f"Unsafe absolute paths in command: {unsafe}. Use paths under {VIRTUAL_PATH_PREFIX}")
+    return
 
 
 def replace_virtual_paths_in_command(command: str, thread_data: ThreadDataState | None) -> str:

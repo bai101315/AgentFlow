@@ -87,8 +87,6 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 if attempt >= max_attempts:
                     return self._build_error_message(request, exc, attempt)
 
-
-
 def _build_runtime_middlewares(
     *,
     include_uploads: bool,

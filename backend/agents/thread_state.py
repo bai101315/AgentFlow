@@ -30,4 +30,6 @@ class ThreadState(AgentState):
     artifacts: Annotated[list[str], merge_artifacts]
     todos: NotRequired[list | None]
     uploaded_files: NotRequired[list[dict] | None]
+    cached_system_prompt: NotRequired[str | None]
+    cached_system_prompt_signature: NotRequired[str | None]
 

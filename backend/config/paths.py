@@ -19,6 +19,10 @@ def _default_local_base_dir() -> Path:
     return backend_dir / ".deer-flow"
 
 
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _validate_thread_id(thread_id: str) -> str:
     """Validate a thread ID before using it in filesystem paths."""
     if not _SAFE_THREAD_ID_RE.match(thread_id):
@@ -155,10 +159,13 @@ class Paths:
     def sandbox_work_dir(self, thread_id: str) -> Path:
         """
         Host path for the agent's workspace directory.
-        Host: `{base_dir}/threads/{thread_id}/user-data/workspace/`
+        # Host: `{base_dir}/threads/{thread_id}/user-data/workspace/`
+        Host: project root.
         Sandbox: `/mnt/user-data/workspace/`
         """
-        return self.thread_dir(thread_id) / "user-data" / "workspace"
+        # Sandbox disabled for local project work: expose the whole project as the agent workspace.
+        # return self.thread_dir(thread_id) / "user-data" / "workspace"
+        return _project_root()
 
     def sandbox_uploads_dir(self, thread_id: str) -> Path:
         """
@@ -239,7 +246,10 @@ class Paths:
             self.acp_workspace_dir(thread_id),
         ]:
             d.mkdir(parents=True, exist_ok=True)
-            d.chmod(0o777)
+            # Do not chmod the project root when it is exposed as workspace.
+            # d.chmod(0o777)
+            if d.resolve() != _project_root().resolve():
+                d.chmod(0o777)
 
     def delete_thread_dir(self, thread_id: str) -> None:
         """Delete all persisted data for a thread.

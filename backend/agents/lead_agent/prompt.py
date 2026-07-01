@@ -327,7 +327,14 @@ def _get_cached_skills_prompt_section(
     container_base_path: str,
     skill_evolution_section: str,
 ) -> str:
-    filtered = [(name, description, category, location) for name, description, category, location in skill_signature if available_skills_key is None or name in available_skills_key]
+    filtered = sorted(
+        (
+            (name, description, category, location)
+            for name, description, category, location in skill_signature
+            if available_skills_key is None or name in available_skills_key
+        ),
+        key=lambda item: item[0].lower(),
+    )
     skills_list = ""
     if filtered:
         skill_items = "\n".join(
@@ -630,7 +637,7 @@ def get_deferred_tools_prompt_section() -> str:
     if not registry:
         return ""
     
-    names = "\n".join(e.name for e in registry.entries)
+    names = "\n".join(sorted((e.name for e in registry.entries), key=str.lower))
     return f"<available-deferred-tools>\n{names}\n</available-deferred-tools>"
 
 def _build_acp_section() -> str:
@@ -746,3 +753,19 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
     # logger.info(prompt + f"\n<current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>")
 
     return prompt + f"\n<current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>"
+
+
+def build_session_prompt(
+    subagent_enabled: bool = False,
+    max_concurrent_subagents: int = 3,
+    *,
+    agent_name: str | None = None,
+    available_skills: set[str] | None = None,
+) -> str:
+    """Build the single prompt that will be frozen for a session."""
+    return apply_prompt_template(
+        subagent_enabled=subagent_enabled,
+        max_concurrent_subagents=max_concurrent_subagents,
+        agent_name=agent_name,
+        available_skills=available_skills,
+    )

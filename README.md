@@ -167,21 +167,15 @@ Start the CLI:
 python main.py
 ```
 
-The application opens a main menu:
+The application starts chat directly with the configured agent:
 
-```text
-1) Enter Chat
-2) Manage Agents
-3) Exit
+```yaml
+active_agent: hl
 ```
 
-From the agent management menu, you can:
-
-- Create a new agent.
-- Delete an existing custom agent.
-- Switch the current agent.
-
-During chat, type `/menu` to return to the main menu, or `exit` / `q` to quit.
+Change `active_agent` in `config.yaml` to switch agents. If the configured agent
+does not exist yet, the CLI creates a minimal custom agent directory for it.
+During chat, type `exit` / `q` to quit.
 
 ## Custom Agents
 

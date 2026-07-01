@@ -87,6 +87,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             "supports_thinking",
             "supports_reasoning_effort",
             "when_thinking_enabled",
+            "when_thinking_disabled",
             "thinking",
             "supports_vision",
         },
@@ -97,6 +98,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
 
     has_thinking_settings = (model_config.when_thinking_enabled is not None) or (model_config.thinking is not None)
     effective_wte: dict = dict(model_config.when_thinking_enabled) if model_config.when_thinking_enabled else {}
+    effective_wtd: dict = dict(model_config.when_thinking_disabled) if model_config.when_thinking_disabled else {}
 
     if model_config.thinking is not None:
         merged_thinking = {**(effective_wte.get("thinking") or {}), **model_config.thinking}
@@ -109,7 +111,9 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
 
     # 用户关闭深度思考模式时，适配不同模型的「思考禁用逻辑」
     if not thinking_enabled and has_thinking_settings:
-        if effective_wte.get("extra_body", {}).get("thinking", {}).get("type"):
+        if effective_wtd:
+            model_settings_from_config = _deep_merge_dicts(model_settings_from_config, effective_wtd)
+        elif effective_wte.get("extra_body", {}).get("thinking", {}).get("type"):
             # OpenAI-compatible gateway: thinking is nested under extra_body
             model_settings_from_config["extra_body"] = _deep_merge_dicts(
                 model_settings_from_config.get("extra_body"),

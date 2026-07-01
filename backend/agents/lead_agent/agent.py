@@ -4,10 +4,15 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, SummarizationMiddleware
 from langchain_core.runnables import RunnableConfig
 
-from agents.lead_agent.prompt import apply_prompt_template, warm_enabled_skills_cache
+from agents.lead_agent.prompt import build_session_prompt, warm_enabled_skills_cache
 from agents.middlewares.clarification_middleware import ClarificationMiddleware
 from agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
 from agents.middlewares.memory_middleware import MemoryMiddleware
+from agents.middlewares.prompt_cache_middleware import (
+    PROMPT_CACHE_PLACEHOLDER,
+    PromptCacheMiddleware,
+    build_prompt_cache_signature,
+)
 # from agents.middlewares.subagent_limit_middleware import SubagentLimitMiddleware
 from agents.middlewares.title_middleware import TitleMiddleware
 from agents.middlewares.todo_middleware import TodoMiddleware
@@ -23,11 +28,16 @@ from models import create_chat_model
 
 logger = logging.getLogger(__name__)
 
+_PREFERRED_DEFAULT_MODEL_NAME = "deepseek-v4"
+
 
 def _resolve_model_name(requested_model_name: str | None = None) -> str:
     """Resolve a runtime model name safely, falling back to default if invalid. Returns None if no models are configured."""
     app_config = get_app_config()
-    default_model_name = app_config.models[0].name if app_config.models else None
+    # Original default selection kept for reference:
+    # default_model_name = app_config.models[0].name if app_config.models else None
+    preferred_default = app_config.get_model_config(_PREFERRED_DEFAULT_MODEL_NAME)
+    default_model_name = preferred_default.name if preferred_default is not None else (app_config.models[0].name if app_config.models else None)
     if default_model_name is None:
         raise ValueError("No chat models are configured. Please configure at least one model in config.yaml.")
     
@@ -196,6 +206,42 @@ Being proactive with task management demonstrates thoroughness and ensures all r
     return TodoMiddleware(system_prompt=system_prompt, tool_description=tool_description)
 
 
+def _make_prompt_cache_middleware(
+    *,
+    model_name: str | None,
+    model_config,
+    agent_name: str | None,
+    agent_config,
+    subagent_enabled: bool,
+    max_concurrent_subagents: int,
+    is_bootstrap: bool,
+) -> PromptCacheMiddleware:
+    session_skills = (
+        {"bootstrap"}
+        if is_bootstrap
+        else (set(agent_config.skills) if agent_config and agent_config.skills is not None else None)
+    )
+    signature = build_prompt_cache_signature(
+        model_name=model_name,
+        model_config=model_config,
+        agent_name=agent_name,
+        agent_config=agent_config,
+        subagent_enabled=subagent_enabled,
+        max_concurrent_subagents=max_concurrent_subagents,
+        is_bootstrap=is_bootstrap,
+    )
+    return PromptCacheMiddleware(
+        prompt_builder=lambda: build_session_prompt(
+            subagent_enabled=subagent_enabled,
+            max_concurrent_subagents=max_concurrent_subagents,
+            agent_name=agent_name,
+            available_skills=session_skills,
+        ),
+        signature=signature,
+        model_name=getattr(model_config, "model", None) or model_name,
+    )
+
+
 
 # ThreadDataMiddleware must be before SandboxMiddleware to ensure thread_id is available
 # UploadsMiddleware should be after ThreadDataMiddleware to access thread_id
@@ -207,7 +253,13 @@ Being proactive with task management demonstrates thoroughness and ensures all r
 # ViewImageMiddleware should be before ClarificationMiddleware to inject image details before LLM
 # ToolErrorHandlingMiddleware should be before ClarificationMiddleware to convert tool exceptions to ToolMessages
 # ClarificationMiddleware should be last to intercept clarification requests after model calls
-def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_name: str | None = None, custom_middlewares: list[AgentMiddleware] | None = None):
+def _build_middlewares(
+    config: RunnableConfig,
+    model_name: str | None,
+    agent_name: str | None = None,
+    custom_middlewares: list[AgentMiddleware] | None = None,
+    prompt_cache_middleware: AgentMiddleware | None = None,
+):
     """Build middleware chain based on runtime configuration.
 
     Args:
@@ -219,11 +271,15 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
         List of middleware instances.
     """
     middlewares = build_lead_runtime_middlewares(lazy_init=True)
+
+    if prompt_cache_middleware is not None:
+        middlewares.append(prompt_cache_middleware)
     
     # Add summarization middleware if enabled
-    summarization_middleware = _create_summarization_middleware()
-    if summarization_middleware is not None:
-        middlewares.append(summarization_middleware)
+    # TODO: 要实现prompt-caching, 但是summarization会改变一些内容，暂时先不考虑
+    # summarization_middleware = _create_summarization_middleware()
+    # if summarization_middleware is not None:
+    #     middlewares.append(summarization_middleware)
 
     # Add TodoList middleware if plan mode is enabled
     is_plan_mode = config.get("configurable", {}).get("is_plan_mode", False)
@@ -369,6 +425,16 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
     # Warm skills cache before prompt rendering so first-turn skills_section is available.
     if not warm_enabled_skills_cache():
         logger.warning("Skills cache warm-up timed out; skills_section may be empty on first turn")
+
+    prompt_cache_middleware = _make_prompt_cache_middleware(
+        model_name=model_name,
+        model_config=model_config,
+        agent_name=agent_name,
+        agent_config=agent_config,
+        subagent_enabled=subagent_enabled,
+        max_concurrent_subagents=max_concurrent_subagents,
+        is_bootstrap=is_bootstrap,
+    )
     
     if is_bootstrap:
         # Special bootstrap agent with minimal prompt for initial custom agent creation flow
@@ -376,12 +442,8 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
         return create_agent(
             model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, **model_overrides),
             tools=tools,
-            middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
-            system_prompt=apply_prompt_template(
-                subagent_enabled=subagent_enabled,
-                max_concurrent_subagents=max_concurrent_subagents,
-                available_skills=set(["bootstrap"]),
-            ),
+            middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name, prompt_cache_middleware=prompt_cache_middleware),
+            system_prompt=PROMPT_CACHE_PLACEHOLDER,
             checkpointer=checkpointer,
             state_schema=ThreadState,
         )
@@ -390,13 +452,8 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort, **model_overrides),
         tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
-        middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
-        system_prompt=apply_prompt_template(
-            subagent_enabled=subagent_enabled, 
-            max_concurrent_subagents=max_concurrent_subagents, 
-            agent_name=agent_name, 
-            available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
-        ),
+        middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name, prompt_cache_middleware=prompt_cache_middleware),
+        system_prompt=PROMPT_CACHE_PLACEHOLDER,
         checkpointer=checkpointer,
         state_schema=ThreadState
     )

@@ -1,0 +1,116 @@
+{
+  "baseline": {
+    "mode": "no-cache",
+    "thread_id": "no-cache-d4811835fe",
+    "agent_name": "wyy2",
+    "model_name": "deepseek-v4",
+    "initial_memory": {
+      "phase": "before_turn_1",
+      "sha256": "3b3b2da2c490833c",
+      "memory_bytes": 14650,
+      "fact_count": 1,
+      "first_fact_preview": "alpha-block-000: profile=alpha; topic=prompt-caching-benchmark; evidence_marker=ALPHA_000; payload=alpha|alpha|alpha|alp"
+    },
+    "mutated_memory": {
+      "phase": "before_turn_2_after_manual_memory_mutation",
+      "sha256": "b4708c266b7e0b2d",
+      "memory_bytes": 14650,
+      "fact_count": 1,
+      "first_fact_preview": "bravo-block-000: profile=bravo; topic=prompt-caching-benchmark; evidence_marker=BRAVO_000; payload=bravo|bravo|bravo|bra"
+    },
+    "initial_prompt": {
+      "phase": "before_turn_1",
+      "sha256": "3f228fe0b3a85019",
+      "prompt_bytes": 35711
+    },
+    "restart_prompt": {
+      "phase": "before_turn_2_after_restart",
+      "sha256": "3f228fe0b3a85019",
+      "prompt_bytes": 35711
+    },
+    "turn1": {
+      "turn": 1,
+      "input_tokens": 11987,
+      "output_tokens": 111,
+      "total_tokens": 12098,
+      "cache_read_tokens": 7936,
+      "cache_creation_tokens": 0,
+      "prompt_cache_hit_tokens": 7936,
+      "prompt_cache_miss_tokens": 4051
+    },
+    "turn2": {
+      "turn": 2,
+      "input_tokens": 12105,
+      "output_tokens": 275,
+      "total_tokens": 12380,
+      "cache_read_tokens": 12032,
+      "cache_creation_tokens": 0,
+      "prompt_cache_hit_tokens": 12032,
+      "prompt_cache_miss_tokens": 73
+    }
+  },
+  "cached": {
+    "mode": "cache-on",
+    "thread_id": "cache-on-4e762238fb",
+    "agent_name": "wyy2",
+    "model_name": "deepseek-v4",
+    "initial_memory": {
+      "phase": "before_turn_1",
+      "sha256": "3b3b2da2c490833c",
+      "memory_bytes": 14650,
+      "fact_count": 1,
+      "first_fact_preview": "alpha-block-000: profile=alpha; topic=prompt-caching-benchmark; evidence_marker=ALPHA_000; payload=alpha|alpha|alpha|alp"
+    },
+    "mutated_memory": {
+      "phase": "before_turn_2_after_manual_memory_mutation",
+      "sha256": "b4708c266b7e0b2d",
+      "memory_bytes": 14650,
+      "fact_count": 1,
+      "first_fact_preview": "bravo-block-000: profile=bravo; topic=prompt-caching-benchmark; evidence_marker=BRAVO_000; payload=bravo|bravo|bravo|bra"
+    },
+    "initial_prompt": {
+      "phase": "before_turn_1",
+      "sha256": "3f228fe0b3a85019",
+      "prompt_bytes": 35711
+    },
+    "restart_prompt": {
+      "phase": "before_turn_2_after_restart",
+      "sha256": "3f228fe0b3a85019",
+      "prompt_bytes": 35711
+    },
+    "turn1": {
+      "turn": 1,
+      "input_tokens": 11987,
+      "output_tokens": 29,
+      "total_tokens": 12016,
+      "cache_read_tokens": 11904,
+      "cache_creation_tokens": 0,
+      "prompt_cache_hit_tokens": 11904,
+      "prompt_cache_miss_tokens": 83
+    },
+    "turn2": {
+      "turn": 2,
+      "input_tokens": 12023,
+      "output_tokens": 295,
+      "total_tokens": 12318,
+      "cache_read_tokens": 11904,
+      "cache_creation_tokens": 0,
+      "prompt_cache_hit_tokens": 11904,
+      "prompt_cache_miss_tokens": 119
+    }
+  },
+  "measured_fields": [
+    "memory_sha256",
+    "memory_bytes",
+    "fact_count",
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "cache_read_tokens",
+    "cache_creation_tokens",
+    "prompt_cache_hit_tokens",
+    "prompt_cache_miss_tokens",
+    "billable_input_tokens"
+  ],
+  "note": "This benchmark measures provider-reported prompt/cache usage fields, not raw internal KV pages."
+}

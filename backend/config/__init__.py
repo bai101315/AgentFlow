@@ -2,6 +2,7 @@ from .app_config import get_app_config
 from .extensions_config import ExtensionsConfig, get_extensions_config
 from .memory_config import MemoryConfig, get_memory_config
 from .paths import Paths, get_paths
+from .prompt_caching_config import PromptCachingConfig, get_prompt_caching_config
 from .skill_evolution_config import SkillEvolutionConfig
 from .skills_config import SkillsConfig
 from .tracing_config import (
@@ -22,6 +23,8 @@ __all__ = [
     "get_extensions_config",
     "MemoryConfig",
     "get_memory_config",
+    "PromptCachingConfig",
+    "get_prompt_caching_config",
     "get_tracing_config",
     "get_explicitly_enabled_tracing_providers",
     "get_enabled_tracing_providers",
