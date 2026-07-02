@@ -305,20 +305,38 @@ task(description="Oracle Cloud analysis", prompt="...", subagent_type="general-p
 </subagent_system>"""
 
 
-def _build_skill_evolution_section(skill_evolution_enabled: bool) -> str:
+def _build_skill_evolution_section(skill_evolution_enabled: bool, *, auto_create: bool = True) -> str:
     if not skill_evolution_enabled:
         return ""
+    create_policy = (
+        "When the reusable pattern and class-level skill name are clear, you may create a new custom skill directly. "
+        "Ask for confirmation only when the scope or name is ambiguous."
+        if auto_create
+        else "Before creating a new custom skill, confirm with the user first. You may still patch existing custom skills directly when the fix is clear."
+    )
     return """
 ## Skill Self-Evolution
-After completing a task, consider creating or updating a skill when:
-- The task required 5+ tool calls to resolve
-- You overcame non-obvious errors or pitfalls
-- The user corrected your approach and the corrected version worked
-- You discovered a non-trivial, recurring workflow
-If you used a skill and encountered issues not covered by it, patch it immediately.
-Prefer patch over edit. Before creating a new skill, confirm with the user first.
-Skip simple one-off tasks.
-"""
+Use `skill_manage` as the only write path for agent-managed skill changes. It keeps writes under `skills/custom`, validates skill markdown, scans content for safety, records history, and refreshes the skills prompt cache.
+
+First-class signals to preserve:
+- The user corrects your style, tone, formatting, verbosity, or response shape, especially "stop doing X", "too verbose", "don't format like this", "just give me the answer", or equivalent feedback.
+- The user corrects your workflow, method, step order, command choice, or debugging approach and the corrected approach works.
+- You discover a non-trivial reusable technical workflow, repair pattern, guardrail, or pitfall after meaningful tool use.
+- You used a skill and found that it is wrong, incomplete, stale, or missing an important step.
+
+Do not preserve:
+- One-off task details, transient summaries, market/news requests, or project-specific facts that are not reusable.
+- Environment-dependent failures such as missing binaries, unavailable commands, local install drift, or post-migration breakage.
+- Broad negative claims that a tool or feature is broken.
+- A temporary error that was resolved in the same conversation, unless the durable lesson is the retry or recovery pattern.
+
+Action priority:
+1. Patch the current relevant custom skill when one exists.
+2. Add a support file under `references/`, `templates/`, `scripts/`, or `assets/` when the lesson is too detailed for the main skill.
+3. Create a new class-level umbrella skill only when no existing custom skill covers the reusable workflow.
+
+Prefer `patch` over `edit`; use `edit` only when a precise patch is not practical. Skill names must be class-level hyphen-case names, not issue IDs, PR numbers, error strings, codenames, or one-off task names.
+""" + create_policy + "\n"
 
 @lru_cache(maxsize=32)
 def _get_cached_skills_prompt_section(
@@ -448,6 +466,8 @@ You: "Deploying to staging..." [proceed]
 
 {skills_section}
 
+{session_search_section}
+
 {deferred_tools_section}
 
 {subagent_section}
@@ -538,6 +558,7 @@ combined with a FastAPI gateway for REST API access [citation:FastAPI](https://f
 <critical_reminders>
 - **Clarification First**: ALWAYS clarify unclear/missing/ambiguous requirements BEFORE starting work - never assume or guess
 {subagent_reminder}- Skill First: Always load the relevant skill before starting **complex** tasks.
+- Session Recall: When the user asks about previous conversations, past decisions, earlier files, or "what did we discuss", use `session_search` before answering.
 - Progressive Loading: Load resources incrementally as referenced in skills
 - Output Files: Final deliverables must be in `/mnt/user-data/outputs`
 - Clarity: Be direct and helpful, avoid unnecessary meta-commentary
@@ -590,10 +611,12 @@ def get_skills_prompt_section(available_skills: set[str] | None = None) -> str:
         config = get_app_config()
         container_base_path = config.skills.container_path
         skill_evolution_enabled = config.skill_evolution.enabled
+        skill_evolution_auto_create = getattr(config.skill_evolution, "auto_create", True)
 
     except Exception as e:
         container_base_path = "./skills"
         skill_evolution_enabled = False
+        skill_evolution_auto_create = True
 
     if not skills and not skill_evolution_enabled:
         return ""
@@ -609,7 +632,7 @@ def get_skills_prompt_section(available_skills: set[str] | None = None) -> str:
     if not skill_signature and available_key is not None:
         return ""
     
-    skill_evolution_section = _build_skill_evolution_section(skill_evolution_enabled)
+    skill_evolution_section = _build_skill_evolution_section(skill_evolution_enabled, auto_create=skill_evolution_auto_create)
 
     return _get_cached_skills_prompt_section(skill_signature, available_key, container_base_path, skill_evolution_section)
 
@@ -639,6 +662,23 @@ def get_deferred_tools_prompt_section() -> str:
     
     names = "\n".join(sorted((e.name for e in registry.entries), key=str.lower))
     return f"<available-deferred-tools>\n{names}\n</available-deferred-tools>"
+
+
+def get_session_search_prompt_section() -> str:
+    try:
+        from config import get_app_config
+
+        if not get_app_config().session_search.enabled:
+            return ""
+    except Exception:
+        return ""
+
+    return """<session_search_system>
+Use `session_search` when the user refers to earlier conversations, previous decisions, remembered context, or asks to browse/search past sessions.
+- Call with `query` to search history across sessions.
+- Call with `session_id` and `around_message_id` to inspect neighboring messages around a hit.
+- Call with no arguments to browse recent indexed sessions.
+</session_search_system>"""
 
 def _build_acp_section() -> str:
     """Build the ACP agent prompt section, only if ACP agents are configured."""
@@ -727,6 +767,7 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
 
     # Get deferred tools section (tool_search) —— 获取延迟工具部分
     deferred_tools_section = get_deferred_tools_prompt_section()
+    session_search_section = get_session_search_prompt_section()
 
     # NOTE：不考虑ACP
     # Build ACP agent section only if ACP agents are configured
@@ -743,6 +784,7 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
         agent_name=agent_name or "DeerFlow 2.0",
         soul=get_agent_soul(agent_name),
         skills_section=skills_section,
+        session_search_section=session_search_section,
         deferred_tools_section=deferred_tools_section,
         memory_context=memory_context,
         subagent_section=subagent_section,

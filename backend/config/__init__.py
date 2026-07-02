@@ -4,6 +4,7 @@ from .memory_config import MemoryConfig, get_memory_config
 from .paths import Paths, get_paths
 from .prompt_caching_config import PromptCachingConfig, get_prompt_caching_config
 from .skill_evolution_config import SkillEvolutionConfig
+from .self_improvement_config import BackgroundReviewConfig, CuratorConfig, SessionSearchConfig
 from .skills_config import SkillsConfig
 from .tracing_config import (
     get_enabled_tracing_providers,

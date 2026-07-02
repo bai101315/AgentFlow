@@ -12,3 +12,7 @@ class SkillEvolutionConfig(BaseModel):
         default=None,
         description="Optional model name for skill security moderation. Defaults to the primary chat model.",
     )
+    auto_create: bool = Field(
+        default=True,
+        description="Whether the agent may create new custom skills without confirmation when the reusable pattern is clear.",
+    )

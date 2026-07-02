@@ -28,6 +28,7 @@ from skill.manager import (
     validate_skill_name,
 )
 from skill.security_scanner import scan_skill_content
+from skill.usage import update_skill_usage_for_write
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +51,20 @@ def _get_thread_id(runtime: ToolRuntime[ContextT, ThreadState] | None) -> str | 
     return runtime.config.get("configurable", {}).get("thread_id")
 
 
-def _history_record(*, action: str, file_path: str, prev_content: str | None, new_content: str | None, thread_id: str | None, scanner: dict[str, Any]) -> dict[str, Any]:
+def _history_record(
+    *,
+    action: str,
+    file_path: str,
+    prev_content: str | None,
+    new_content: str | None,
+    thread_id: str | None,
+    scanner: dict[str, Any],
+    origin: str = "foreground",
+) -> dict[str, Any]:
     return {
         "action": action,
         "author": "agent",
+        "origin": origin,
         "thread_id": thread_id,
         "file_path": file_path,
         "prev_content": prev_content,
@@ -76,7 +87,7 @@ async def _to_thread(func, /, *args, **kwargs):
 
 
 async def _skill_manage_impl(
-    runtime: ToolRuntime[ContextT, ThreadState],
+    runtime: ToolRuntime[ContextT, ThreadState] | None,
     action: str,
     name: str,
     content: str | None = None,
@@ -84,6 +95,7 @@ async def _skill_manage_impl(
     find: str | None = None,
     replace: str | None = None,
     expected_count: int | None = None,
+    origin: str = "foreground",
 ) -> str:
     """Manage custom skills under skills/custom/.
 
@@ -113,8 +125,9 @@ async def _skill_manage_impl(
             await _to_thread(
                 append_history,
                 name,
-                _history_record(action="create", file_path="SKILL.md", prev_content=None, new_content=content, thread_id=thread_id, scanner=scan),
+                _history_record(action="create", file_path="SKILL.md", prev_content=None, new_content=content, thread_id=thread_id, scanner=scan, origin=origin),
             )
+            await _to_thread(update_skill_usage_for_write, name, action="create", origin=origin)
             await refresh_skills_system_prompt_cache_async()
             return f"Created custom skill '{name}'."
 
@@ -130,8 +143,9 @@ async def _skill_manage_impl(
             await _to_thread(
                 append_history,
                 name,
-                _history_record(action="edit", file_path="SKILL.md", prev_content=prev_content, new_content=content, thread_id=thread_id, scanner=scan),
+                _history_record(action="edit", file_path="SKILL.md", prev_content=prev_content, new_content=content, thread_id=thread_id, scanner=scan, origin=origin),
             )
+            await _to_thread(update_skill_usage_for_write, name, action="edit", origin=origin)
             await refresh_skills_system_prompt_cache_async()
             return f"Updated custom skill '{name}'."
 
@@ -154,8 +168,9 @@ async def _skill_manage_impl(
             await _to_thread(
                 append_history,
                 name,
-                _history_record(action="patch", file_path="SKILL.md", prev_content=prev_content, new_content=new_content, thread_id=thread_id, scanner=scan),
+                _history_record(action="patch", file_path="SKILL.md", prev_content=prev_content, new_content=new_content, thread_id=thread_id, scanner=scan, origin=origin),
             )
+            await _to_thread(update_skill_usage_for_write, name, action="patch", origin=origin)
             await refresh_skills_system_prompt_cache_async()
             return f"Patched custom skill '{name}' ({replacement_count} replacement(s) applied, {occurrences} match(es) found)."
 
@@ -166,9 +181,10 @@ async def _skill_manage_impl(
             await _to_thread(
                 append_history,
                 name,
-                _history_record(action="delete", file_path="SKILL.md", prev_content=prev_content, new_content=None, thread_id=thread_id, scanner={"decision": "allow", "reason": "Deletion requested."}),
+                _history_record(action="delete", file_path="SKILL.md", prev_content=prev_content, new_content=None, thread_id=thread_id, scanner={"decision": "allow", "reason": "Deletion requested."}, origin=origin),
             )
             await _to_thread(shutil.rmtree, skill_dir)
+            await _to_thread(update_skill_usage_for_write, name, action="delete", origin=origin)
             await refresh_skills_system_prompt_cache_async()
             return f"Deleted custom skill '{name}'."
 
@@ -185,8 +201,9 @@ async def _skill_manage_impl(
             await _to_thread(
                 append_history,
                 name,
-                _history_record(action="write_file", file_path=path, prev_content=prev_content, new_content=content, thread_id=thread_id, scanner=scan),
+                _history_record(action="write_file", file_path=path, prev_content=prev_content, new_content=content, thread_id=thread_id, scanner=scan, origin=origin),
             )
+            await _to_thread(update_skill_usage_for_write, name, action="write_file", origin=origin)
             return f"Wrote '{path}' for custom skill '{name}'."
 
         if action == "remove_file":
@@ -201,8 +218,9 @@ async def _skill_manage_impl(
             await _to_thread(
                 append_history,
                 name,
-                _history_record(action="remove_file", file_path=path, prev_content=prev_content, new_content=None, thread_id=thread_id, scanner={"decision": "allow", "reason": "Deletion requested."}),
+                _history_record(action="remove_file", file_path=path, prev_content=prev_content, new_content=None, thread_id=thread_id, scanner={"decision": "allow", "reason": "Deletion requested."}, origin=origin),
             )
+            await _to_thread(update_skill_usage_for_write, name, action="remove_file", origin=origin)
             return f"Removed '{path}' from custom skill '{name}'."
 
         if await _to_thread(public_skill_exists, name):

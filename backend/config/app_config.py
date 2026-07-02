@@ -19,6 +19,7 @@ from config.prompt_caching_config import PromptCachingConfig, load_prompt_cachin
 from config.sandbox_config import SandboxConfig
 from config.skill_evolution_config import SkillEvolutionConfig
 from config.skills_config import SkillsConfig
+from config.self_improvement_config import BackgroundReviewConfig, CuratorConfig, SessionSearchConfig
 from config.stream_bridge_config import StreamBridgeConfig, load_stream_bridge_config_from_dict
 from config.subagents_config import SubagentsAppConfig, load_subagents_config_from_dict
 from config.summarization_config import SummarizationConfig, load_summarization_config_from_dict
@@ -50,6 +51,9 @@ class AppConfig(BaseModel):
     tool_groups: list[ToolGroupConfig] = Field(default_factory=list, description="Available tool groups")
     skills: SkillsConfig = Field(default_factory=SkillsConfig, description="Skills configuration")
     skill_evolution: SkillEvolutionConfig = Field(default_factory=SkillEvolutionConfig, description="Agent-managed skill evolution configuration")
+    background_review: BackgroundReviewConfig = Field(default_factory=BackgroundReviewConfig, description="Background self-improvement review configuration")
+    curator: CuratorConfig = Field(default_factory=CuratorConfig, description="Skill curator lifecycle configuration")
+    session_search: SessionSearchConfig = Field(default_factory=SessionSearchConfig, description="Cross-session search configuration")
     extensions: ExtensionsConfig = Field(default_factory=ExtensionsConfig, description="Extensions configuration (MCP servers and skills state)")
     tool_search: ToolSearchConfig = Field(default_factory=ToolSearchConfig, description="Tool search / deferred loading configuration")
     title: TitleConfig = Field(default_factory=TitleConfig, description="Automatic title generation configuration")

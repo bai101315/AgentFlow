@@ -85,6 +85,10 @@ def get_available_tools(
         # Lazy import: 好处 1：避免循环依赖。2：减少启动时间
         from tools.skill_manage_tool import skill_manage_tool
         builtin_tools.append(skill_manage_tool)
+
+    if getattr(getattr(config, "session_search", None), "enabled", False):
+        from tools.builtins.session_search_tool import session_search_tool
+        builtin_tools.append(session_search_tool)
     
     # Add subagent tools only if enabled via runtime parameter
     # 子智能体工具（如 task_tool）默认不启用，因为它们需要更复杂的思维和规划能力，可能不适合所有模型或使用场景。

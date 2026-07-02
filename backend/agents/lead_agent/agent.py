@@ -299,6 +299,19 @@ def _build_middlewares(
     # Add MemoryMiddleware (after TitleMiddleware)
     middlewares.append(MemoryMiddleware(agent_name=agent_name))
 
+    app_config = get_app_config()
+    if getattr(app_config.session_search, "enabled", False):
+        from agents.middlewares.session_search_middleware import SessionSearchMiddleware
+        middlewares.append(SessionSearchMiddleware())
+
+    if getattr(app_config.background_review, "enabled", False):
+        from agents.middlewares.background_review_middleware import BackgroundReviewMiddleware
+        middlewares.append(BackgroundReviewMiddleware())
+
+    if getattr(app_config.curator, "enabled", False):
+        from agents.middlewares.curator_middleware import CuratorMiddleware
+        middlewares.append(CuratorMiddleware())
+
     # NOTE: no image
     # Add ViewImageMiddleware only if the current model supports vision.
     # Use the resolved runtime model_name from make_lead_agent to avoid stale config values.
@@ -308,7 +321,6 @@ def _build_middlewares(
         # middlewares.append(ViewImageMiddleware())
 
     # Add DeferredToolFilterMiddleware to hide deferred tool schemas from model binding
-    app_config = get_app_config()
     if app_config.tool_search.enabled:
         from agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
         middlewares.append(DeferredToolFilterMiddleware())
