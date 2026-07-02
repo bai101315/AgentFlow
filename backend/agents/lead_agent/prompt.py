@@ -558,7 +558,7 @@ combined with a FastAPI gateway for REST API access [citation:FastAPI](https://f
 <critical_reminders>
 - **Clarification First**: ALWAYS clarify unclear/missing/ambiguous requirements BEFORE starting work - never assume or guess
 {subagent_reminder}- Skill First: Always load the relevant skill before starting **complex** tasks.
-- Session Recall: When the user asks about previous conversations, past decisions, earlier files, or "what did we discuss", use `session_search` before answering.
+- Session Recall: Use `session_search` only when the user explicitly asks about previous conversations, past decisions, remembered context, history, or old sessions.
 - Progressive Loading: Load resources incrementally as referenced in skills
 - Output Files: Final deliverables must be in `/mnt/user-data/outputs`
 - Clarity: Be direct and helpful, avoid unnecessary meta-commentary
@@ -674,10 +674,12 @@ def get_session_search_prompt_section() -> str:
         return ""
 
     return """<session_search_system>
-Use `session_search` when the user refers to earlier conversations, previous decisions, remembered context, or asks to browse/search past sessions.
+Use `session_search` only when the user clearly refers to past conversations or historical context, such as "previously", "last time", "history", "remember", "past decision", "old session", or "what did we discuss".
+Do not call `session_search` for ordinary coding tasks, debugging, file edits, or fresh questions unless the user's request depends on prior conversation context.
 - Call with `query` to search history across sessions.
+- Call with `session_id` to read the beginning and end of one indexed session.
 - Call with `session_id` and `around_message_id` to inspect neighboring messages around a hit.
-- Call with no arguments to browse recent indexed sessions.
+- Call with no arguments only when the user asks to browse recent indexed sessions.
 </session_search_system>"""
 
 def _build_acp_section() -> str:

@@ -75,7 +75,7 @@ class SessionSearchConfig(BaseModel):
     """Configuration for SQLite FTS5 cross-session search."""
 
     enabled: bool = Field(
-        default=False,
+        default=True,
         description="Whether to index conversation turns and expose the session_search tool.",
     )
     db_path: str | None = Field(
@@ -87,4 +87,17 @@ class SessionSearchConfig(BaseModel):
         ge=1,
         le=50,
         description="Default maximum number of session_search results.",
+    )
+    retention_days: int = Field(
+        default=90,
+        ge=1,
+        description="Number of days to keep indexed session messages when auto_prune is enabled.",
+    )
+    auto_prune: bool = Field(
+        default=False,
+        description="Whether to soft-delete indexed messages older than retention_days after indexing.",
+    )
+    index_assistant: bool = Field(
+        default=True,
+        description="Whether to index final assistant replies in addition to user messages.",
     )

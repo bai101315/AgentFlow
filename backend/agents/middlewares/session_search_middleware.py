@@ -12,7 +12,7 @@ from langgraph.config import get_config
 from langgraph.runtime import Runtime
 
 from config import get_app_config
-from session_search.store import index_messages
+from session_search.store import get_session_search_store
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,15 @@ class SessionSearchMiddleware(AgentMiddleware[AgentState]):
     def _index(self, *, thread_id: str, messages: list) -> None:
         try:
             config = get_app_config()
-            index_messages(thread_id=thread_id, messages=messages, db_path=config.session_search.db_path)
+            search_config = config.session_search
+            store = get_session_search_store(search_config.db_path)
+            store.index_messages(
+                thread_id=thread_id,
+                messages=messages,
+                index_assistant=getattr(search_config, "index_assistant", True),
+            )
+            if getattr(search_config, "auto_prune", False):
+                store.prune_older_than(getattr(search_config, "retention_days", 90))
         except Exception:
             logger.exception("Session search indexing failed")
 
