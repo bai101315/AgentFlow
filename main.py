@@ -465,6 +465,59 @@ def _format_ratio(value: float | None) -> str:
     return f"{value * 100:.2f}%"
 
 
+def _safe_session_log_stem(thread_id: str) -> str:
+    stem = re.sub(r"[^a-zA-Z0-9_-]+", "-", thread_id or "default").strip("-")
+    return stem or "default"
+
+
+def _session_log_path(thread_id: str) -> Path:
+    return _session_logs_dir() / f"{_safe_session_log_stem(thread_id)}.json"
+
+
+def _coerce_int(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _normalize_usage_stats(usage: Any) -> dict[str, Any]:
+    if not isinstance(usage, dict):
+        usage = {}
+
+    input_tokens = _coerce_int(usage.get("input_tokens"))
+    output_tokens = _coerce_int(usage.get("output_tokens"))
+    total_tokens = _coerce_int(usage.get("total_tokens")) or input_tokens + output_tokens
+    prompt_cache_hit_tokens = _coerce_int(
+        usage.get("prompt_cache_hit_tokens", usage.get("cache_read_input_tokens"))
+    )
+    prompt_cache_miss_tokens = _coerce_int(
+        usage.get("prompt_cache_miss_tokens", max(0, input_tokens - prompt_cache_hit_tokens))
+    )
+    cache_denominator = prompt_cache_hit_tokens + prompt_cache_miss_tokens
+
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "billable_input_tokens": _coerce_int(
+            usage.get("billable_input_tokens", prompt_cache_miss_tokens)
+        ),
+        "cache_read_input_tokens": _coerce_int(
+            usage.get("cache_read_input_tokens", prompt_cache_hit_tokens)
+        ),
+        "cache_creation_input_tokens": _coerce_int(usage.get("cache_creation_input_tokens")),
+        "prompt_cache_hit_tokens": prompt_cache_hit_tokens,
+        "prompt_cache_miss_tokens": prompt_cache_miss_tokens,
+        "prompt_cache_hit_rate": (
+            prompt_cache_hit_tokens / cache_denominator if cache_denominator > 0 else None
+        ),
+        "cache_signal_available": bool(
+            usage.get("cache_signal_available", cache_denominator > 0)
+        ),
+    }
+
+
 @dataclass
 class SessionTurnRecord:
     turn_index: int
@@ -480,9 +533,8 @@ class SessionTurnRecord:
 class SessionRecorder:
     def __init__(self, *, agent_name: str, thread_id: str, model_name: str | None) -> None:
         started_at = _utc_now_iso()
-        slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", agent_name or "default").strip("-") or "default"
-        self.session_id = f"{slug}-{uuid.uuid4().hex[:8]}"
-        self.path = _session_logs_dir() / f"{started_at[:19].replace(':', '-')}-{self.session_id}.json"
+        self.session_id = thread_id
+        self.path = _session_log_path(thread_id)
         self.started_at = started_at
         self.initial_agent_name = agent_name
         self.initial_thread_id = thread_id
@@ -490,6 +542,9 @@ class SessionRecorder:
         self.turns: list[SessionTurnRecord] = []
         self.ended_at: str | None = None
         self.exit_reason: str | None = None
+        self.merged_legacy_session_ids: list[str] = []
+        self.merged_legacy_files: list[str] = []
+        self._load_existing_records(thread_id=thread_id, current_started_at=started_at)
         self._save()
 
     def record_turn(
@@ -514,6 +569,7 @@ class SessionRecorder:
                 usage=usage,
             )
         )
+        self._renumber_turns()
         self._save()
 
     def finalize(self, exit_reason: str) -> dict[str, Any]:
@@ -522,6 +578,88 @@ class SessionRecorder:
         summary = self._build_summary()
         self._save(summary=summary)
         return summary
+
+    @staticmethod
+    def _turn_key(turn: SessionTurnRecord) -> tuple[str, str, str, str]:
+        return (turn.timestamp, turn.thread_id, turn.user_input, turn.assistant_output)
+
+    @staticmethod
+    def _turn_from_dict(raw: Any) -> SessionTurnRecord | None:
+        if not isinstance(raw, dict):
+            return None
+        timestamp = str(raw.get("timestamp") or "")
+        thread_id = str(raw.get("thread_id") or "")
+        if not timestamp or not thread_id:
+            return None
+        return SessionTurnRecord(
+            turn_index=_coerce_int(raw.get("turn_index")),
+            timestamp=timestamp,
+            agent_name=str(raw.get("agent_name") or ""),
+            thread_id=thread_id,
+            model_name=raw.get("model_name") if raw.get("model_name") is not None else None,
+            user_input=str(raw.get("user_input") or ""),
+            assistant_output=str(raw.get("assistant_output") or ""),
+            usage=_normalize_usage_stats(raw.get("usage")),
+        )
+
+    def _load_existing_records(self, *, thread_id: str, current_started_at: str) -> None:
+        log_dir = _session_logs_dir()
+        if not log_dir.exists():
+            return
+
+        seen_turns: set[tuple[str, str, str, str]] = set()
+        started_values = [current_started_at]
+        merged_session_ids: set[str] = set()
+        merged_files: set[str] = set()
+
+        for path in sorted(log_dir.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                logging.warning("Skipping unreadable session log: %s", path)
+                continue
+            if not isinstance(data, dict):
+                continue
+
+            raw_turns = data.get("turns") if isinstance(data.get("turns"), list) else []
+            matches_thread = data.get("initial_thread_id") == thread_id or any(
+                isinstance(turn, dict) and turn.get("thread_id") == thread_id for turn in raw_turns
+            )
+            if path != self.path and not matches_thread:
+                continue
+
+            if isinstance(data.get("started_at"), str) and data["started_at"]:
+                started_values.append(data["started_at"])
+            if data.get("initial_agent_name") and self.initial_agent_name == "":
+                self.initial_agent_name = str(data["initial_agent_name"])
+            if data.get("initial_model_name") and self.initial_model_name is None:
+                self.initial_model_name = str(data["initial_model_name"])
+
+            session_id = data.get("session_id")
+            if isinstance(session_id, str) and session_id and session_id != thread_id:
+                merged_session_ids.add(session_id)
+            if path != self.path:
+                merged_files.add(path.name)
+
+            for raw_turn in raw_turns:
+                turn = self._turn_from_dict(raw_turn)
+                if turn is None or turn.thread_id != thread_id:
+                    continue
+                key = self._turn_key(turn)
+                if key in seen_turns:
+                    continue
+                seen_turns.add(key)
+                self.turns.append(turn)
+
+        self.started_at = min(started_values)
+        self.turns.sort(key=lambda turn: (turn.timestamp, turn.turn_index))
+        self._renumber_turns()
+        self.merged_legacy_session_ids = sorted(merged_session_ids)
+        self.merged_legacy_files = sorted(merged_files)
+
+    def _renumber_turns(self) -> None:
+        for index, turn in enumerate(self.turns, start=1):
+            turn.turn_index = index
 
     def _build_summary(self) -> dict[str, Any]:
         total_input_tokens = sum(turn.usage["input_tokens"] for turn in self.turns)
@@ -567,6 +705,8 @@ class SessionRecorder:
             "initial_agent_name": self.initial_agent_name,
             "initial_thread_id": self.initial_thread_id,
             "initial_model_name": self.initial_model_name,
+            "merged_legacy_session_ids": self.merged_legacy_session_ids,
+            "merged_legacy_files": self.merged_legacy_files,
             "turns": [
                 {
                     "turn_index": turn.turn_index,
@@ -585,6 +725,8 @@ class SessionRecorder:
 
     def _save(self, summary: dict[str, Any] | None = None) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        if summary is None:
+            summary = self._build_summary()
         self.path.write_text(
             json.dumps(self._to_dict(summary=summary), ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -695,6 +837,10 @@ async def main() -> None:
             current_agent = selected_agent
             current_thread_id = selected_thread_id
             runtime_signature = _runtime_config_signature(selected_agent)
+            if session_recorder is not None and session_recorder.initial_thread_id != selected_thread_id:
+                previous_summary = session_recorder.finalize("agent_switch")
+                _print_session_summary(previous_summary)
+                session_recorder = None
             if session_recorder is None:
                 session_recorder = SessionRecorder(
                     agent_name=selected_agent,
