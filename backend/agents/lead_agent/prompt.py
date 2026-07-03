@@ -13,7 +13,7 @@ from subagents import get_available_subagent_names
 logger = logging.getLogger(__name__)
 
 
-_ENABLED_SKILLS_REFRESH_WAIT_TIMEOUT_SECONDS = 5.0
+_ENABLED_SKILLS_REFRESH_WAIT_TIMEOUT_SECONDS = 0.5
 _enabled_skills_lock = threading.Lock()
 _enabled_skills_cache: list[Skill] | None = None
 _enabled_skills_refresh_active = False
@@ -99,8 +99,12 @@ def warm_enabled_skills_cache(timeout_seconds: float = _ENABLED_SKILLS_REFRESH_W
     if _ensure_enabled_skills_cache().wait(timeout=timeout_seconds):
         return True
 
-    logger.warning("Timed out waiting %.1fs for enabled skills cache warm-up", timeout_seconds)
-    return False
+    logger.warning(
+        "Timed out waiting %.1fs for enabled skills cache warm-up; loading synchronously",
+        timeout_seconds,
+    )
+    _refresh_enabled_skills_cache()
+    return True
 
 # 外部接口：获取技能列表（快速路径）
 def _get_enabled_skills():

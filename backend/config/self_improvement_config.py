@@ -80,7 +80,7 @@ class SessionSearchConfig(BaseModel):
     )
     db_path: str | None = Field(
         default=None,
-        description="Optional SQLite database path. Relative paths resolve under DEER_FLOW_HOME.",
+        description="Optional SQLite database path. Relative paths resolve under AGENTFLOW_HOME.",
     )
     max_results: int = Field(
         default=5,

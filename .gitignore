@@ -2,6 +2,7 @@
 docker/.cache/
 
 # Local agent/runtime state
+.agentflow/
 .deer-flow/
 .deer_flow/
 backend/.deer_flow/

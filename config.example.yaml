@@ -1,0 +1,152 @@
+config_version: 5
+log_level: info
+active_agent: test
+
+token_usage:
+  enabled: false
+
+prompt_caching:
+  enabled: true
+  mode: frozen_system_prompt
+  explicit_markers: auto
+  cache_ttl: "5m"
+  recent_message_breakpoints: 3
+  log_usage: true
+
+models:
+  - name: qwen3.5-flash
+    display_name: Qwen Flash
+    use: langchain_openai:ChatOpenAI
+    model: qwen3.5-flash
+    api_key: $DASHSCOPE_API_KEY
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    max_tokens: 8192
+    temperature: 0.7
+
+  - name: deepseek-v4
+    display_name: DeepSeek V4
+    use: backend.models.patched_deepseek:PatchedChatDeepSeek
+    model: deepseek-v4-pro
+    api_key: $DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com
+    timeout: 600.0
+    max_retries: 2
+    max_tokens: 8192
+    supports_thinking: true
+    supports_vision: false
+    when_thinking_enabled:
+      extra_body:
+        thinking:
+          type: enabled
+    when_thinking_disabled:
+      extra_body:
+        thinking:
+          type: disabled
+
+tool_groups:
+  - name: web
+  - name: file:read
+  - name: file:write
+  - name: bash
+
+tools:
+  - name: tavily_search
+    group: web
+    use: community.tavily.tools:web_search_tool
+    max_results: 5
+  - name: ls
+    group: file:read
+    use: sandbox.tools:ls_tool
+  - name: read_file
+    group: file:read
+    use: sandbox.tools:read_file_tool
+  - name: write_file
+    group: file:write
+    use: sandbox.tools:write_file_tool
+  - name: str_replace
+    group: file:write
+    use: sandbox.tools:str_replace_tool
+  - name: bash
+    group: bash
+    use: sandbox.tools:bash_tool
+
+tool_search:
+  enabled: true
+
+sandbox:
+  use: sandbox.local:LocalSandboxProvider
+  allow_host_bash: false
+  bash_output_max_chars: 20000
+  read_file_output_max_chars: 50000
+  ls_output_max_chars: 20000
+
+skills:
+  path: ./skills
+  container_path: ../skills
+
+title:
+  enabled: false
+
+summarization:
+  enabled: true
+  trigger:
+    - type: tokens
+      value: 15564
+  keep:
+    type: messages
+    value: 10
+  trim_tokens_to_summarize: 15564
+
+memory:
+  enabled: true
+  storage_path: memory.json
+  debounce_seconds: 30
+  max_facts: 100
+  fact_confidence_threshold: 0.7
+  injection_enabled: true
+  max_injection_tokens: 2000
+
+subagents:
+  timeout_seconds: 60
+
+checkpointer:
+  type: sqlite
+  connection_string: checkpoints.db
+
+uploads:
+  pdf_converter: auto
+
+skill_evolution:
+  enabled: true
+  auto_create: false
+  moderation_model_name: null
+
+background_review:
+  enabled: false
+  skill_nudge_interval: 10
+  max_messages: 24
+  review_model_name: null
+  notifications: "off"
+  max_actions_per_review: 3
+
+session_search:
+  enabled: true
+  db_path: null
+  max_results: 5
+  retention_days: 90
+  auto_prune: false
+  index_assistant: true
+
+curator:
+  enabled: false
+  interval_hours: 0
+  min_idle_hours: 0
+  stale_after_days: 1
+  archive_after_days: 1
+  consolidate: false
+  model_name: null
+
+channels:
+  wechat:
+    enabled: false
+    state_dir: ./.agentflow/wechat/state

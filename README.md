@@ -1,116 +1,74 @@
 # AgentFlow
 
-AgentFlow is a local multi-agent orchestration and governance framework built on LangGraph and LangChain.
+AgentFlow is a local agent runtime for coding, tool governance, memory, session recall, and skill evolution.
 
-It focuses on runtime-level concerns that appear when multiple agents run in the same local environment: tool context control, middleware governance, memory persistence, session isolation, local sandbox execution, MCP tool integration, and customizable agent behavior.
+It is not trying to be a full OpenClaw or Hermes clone. The project focuses on the runtime pieces behind a personal assistant: how an agent gets tools safely, remembers useful context, resumes sessions, searches old conversations, and turns repeated workflows into reusable skills.
 
-The goal is not only to provide a chat interface, but to provide a configurable Agent Runtime for building task-specific agents with independent role definitions, model connections, memory spaces, tool permissions, and skills.
+The current product surface is intentionally small: a local CLI and an embedded Python client. The engineering focus is reliability and explainability, especially for local coding-agent workflows.
 
 ## Design Goals
 
-AgentFlow is designed around several runtime-level problems:
+- Keep custom agents isolated by role definition, memory, thread, model profile, and tool groups.
+- Avoid exposing every MCP or local tool to every model by default.
+- Make long-running conversations resumable through checkpointed state.
+- Preserve durable user and project context without storing transient task noise.
+- Support skill creation and patching through a governed write path.
+- Keep local execution practical on Windows while making permission boundaries explicit.
+- Build toward tool-use evaluation instead of relying on ad hoc demos.
 
-- Prevent context pollution between multiple agents running in the same process.
-- Avoid exposing all tools to every agent by default.
-- Keep long-running conversations resumable through checkpointed session state.
-- Preserve useful long-term user and task context through per-agent memory.
-- Keep MCP and local tools controllable as the tool surface grows.
-- Provide a local execution model that is practical on Windows while still enforcing path and permission boundaries.
+## Core Capabilities
 
-## Features
-
-- Agent lifecycle management: create, delete, switch, and resume custom agents.
-- Runtime context isolation: each agent can maintain independent role definition, session thread, memory file, and workspace.
-- Agent-level model binding: configure provider model, API key, and base URL per agent.
-- Tool governance: expose tools by configurable groups such as web, file read, file write, and bash.
-- Deferred tool discovery: integrate MCP tools through a delayed `tool_search` mechanism to reduce prompt context overhead.
-- Middleware governance: support summarization, memory update, loop detection, clarification, and tool error handling.
-- Long-term memory and session persistence: combine per-agent memory with SQLite checkpointing.
-- Skill injection: load reusable skills from local public/custom skill directories.
-
-## Tech Stack
-
-- Python 3.12+
-- LangGraph / LangGraph SDK
-- LangChain
-- FastAPI
-- Pydantic
-- PyYAML
-- python-dotenv
-- aiosqlite
-- uv
-
-The project uses a workspace-style Python setup. The root package is defined in `pyproject.toml`, with core runtime logic under `backend/`.
+- Agent runtime: create and run custom agents with per-agent SOUL, memory, model overrides, and tool permissions.
+- Tool governance: configure tool groups, local file/bash tools, MCP tools, and deferred tool discovery through `tool_search`.
+- Memory: store compact long-term facts and inject them into future sessions.
+- Session search: index user and assistant turns into SQLite FTS for cross-session recall.
+- Skills: load public/custom skills and update custom skills through `skill_manage` with validation and history.
+- Middleware: compose memory updates, session indexing, loop detection, prompt caching, clarification, and tool error handling.
+- Local sandbox mapping: run local file operations against controlled workspace paths; host bash is opt-in and should remain disabled for demos.
 
 ## Project Structure
 
 ```text
 .
-|-- main.py                  # CLI entry point
-|-- config.yaml              # Global model, tool, memory, sandbox, and checkpoint config
-|-- extensions_config.json   # MCP servers and skill extension config
-|-- backend/                 # Core agent, model, tool, memory, config, and sandbox logic
-|-- skills/                  # Local skill definitions
-|-- .deer_flow/              # Local runtime state, custom agents, memories, and threads
-|-- pyproject.toml           # Project metadata and dependencies
-`-- README.md
+|-- main.py                         # CLI entry point
+|-- config.yaml                     # Private local config; ignored by git
+|-- config.example.yaml             # Safe example config
+|-- extensions_config.json          # Private MCP/skills config; ignored by git
+|-- extensions_config.example.json  # Safe example extension config
+|-- backend/                        # Core runtime, agents, tools, memory, config, sandbox
+|-- skills/                         # Public and custom skills
+|-- docs/                           # Demo and roadmap notes
+|-- .agentflow/                     # Local runtime state; ignored by git
+`-- ARCHITECTURE.md                 # High-level architecture
 ```
 
-Runtime data is stored under `.deer_flow/` by default. This directory may contain local memories, checkpoint data, thread workspaces, and custom agent configuration.
+Runtime data is stored under `.agentflow/` by default. Set `AGENTFLOW_HOME` to use another location. `DEER_FLOW_HOME` is still accepted as a compatibility fallback for older local setups.
 
 ## Installation
 
-Clone the repository:
-
-```bash
-git clone https://github.com/bai101315/LeetCode-Assistant.git
-cd LeetCode-Assistant
-```
-
-Create and install the Python environment with `uv`:
-
-```bash
+```powershell
 uv sync
+Copy-Item .env.example .env
+Copy-Item config.example.yaml config.yaml
+Copy-Item extensions_config.example.json extensions_config.json
 ```
 
-Alternatively, use your own Python 3.12+ environment and install the dependencies declared in `pyproject.toml`.
+Fill in the API keys you actually use in `.env`. Do not commit `.env`, `config.yaml`, `extensions_config.json`, `.agentflow/`, logs, or database files.
 
 ## Configuration
 
-### Environment Variables
-
-Create a `.env` file for sensitive values:
-
-```env
-DEEPSEEK_API_KEY=your_deepseek_api_key
-TAVILY_API_KEY=your_tavily_api_key
-```
-
-Do not commit `.env` or real API keys to GitHub.
-
-### Global Model Configuration
-
-Global model profiles are defined in `config.yaml`:
+Model profiles live in `config.yaml` and should reference environment variables:
 
 ```yaml
 models:
-  - name: example-model
-    display_name: Example Model
-    use: langchain_openai:ChatOpenAI
-    model: example-provider-model
-    api_key: $EXAMPLE_API_KEY
-    base_url: https://api.example.com/v1
-    max_tokens: 4096
-    temperature: 0.7
-    supports_thinking: false
-    supports_vision: false
+  - name: deepseek-v4
+    use: backend.models.patched_deepseek:PatchedChatDeepSeek
+    model: deepseek-v4-pro
+    api_key: $DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com
 ```
 
-Custom agents can also override the provider model, API key, and base URL in their own configuration files.
-
-### Tools
-
-Tools are configured in `config.yaml` using tool groups:
+Tool access is controlled by groups:
 
 ```yaml
 tool_groups:
@@ -120,118 +78,69 @@ tool_groups:
   - name: bash
 ```
 
-Each agent can restrict its available tools by setting `tool_groups` in its own `config.yaml`.
-
-### Memory and Checkpointing
-
-Long-term memory and session persistence are configured in `config.yaml`:
+For a safe showcase configuration, keep host bash disabled:
 
 ```yaml
-memory:
-  enabled: true
-  storage_path: memory.json
-  debounce_seconds: 30
-  injection_enabled: true
-
-checkpointer:
-  type: sqlite
-  connection_string: checkpoints.db
+sandbox:
+  use: sandbox.local:LocalSandboxProvider
+  allow_host_bash: false
 ```
 
-Each custom agent can maintain its own memory file under `.deer_flow/agents/<agent-name>/memory.json`.
-
-### Skills
-
-Skills are loaded from the local `skills/` directory:
-
-```yaml
-skills:
-  path: ./skills
-  container_path: ../skills
-```
-
-Agent-specific skills can be controlled in the agent configuration:
-
-```yaml
-skills:
-  - example-skill
-```
-
-If the `skills` field is omitted, enabled skills are loaded according to the extension configuration.
+Enable host bash only in a fully trusted local environment.
 
 ## Usage
 
 Start the CLI:
 
-```bash
+```powershell
 python main.py
 ```
 
-The application starts chat directly with the configured agent:
-
-```yaml
-active_agent: hl
-```
-
-Change `active_agent` in `config.yaml` to switch agents. If the configured agent
-does not exist yet, the CLI creates a minimal custom agent directory for it.
-During chat, type `exit` / `q` to quit.
-
-## Custom Agents
-
-Custom agents are stored under:
+The active custom agent is selected by `active_agent` in `config.yaml`. If the configured agent does not exist, AgentFlow creates a minimal agent directory under:
 
 ```text
-.deer_flow/agents/<agent-name>/
+.agentflow/agents/<agent-name>/
 ```
 
 Each custom agent may contain:
 
 ```text
-config.yaml    # Agent metadata, model overrides, tools, and skills
-SOUL.md        # Agent role, mission, communication style, and boundaries
+config.yaml    # Agent metadata, model overrides, tool groups, and skills
+SOUL.md        # Agent role, mission, style, and boundaries
 memory.json    # Agent-specific long-term memory
 ```
 
-Example agent configuration:
+## Development
 
-```yaml
-name: daily-report
-description: AI community daily report assistant
-model: example-model
-provider_model: example-provider-model
-api_key: $EXAMPLE_API_KEY
-base_url: https://api.example.com/v1
-tool_groups:
-  - web
-  - file:read
-skills:
-  - report-writing
+Run the core tests:
+
+```powershell
+$env:PYTHONPATH='backend'
+.\.venv\Scripts\python.exe -m pytest backend\tests -q
+```
+
+Run import checks:
+
+```powershell
+$env:PYTHONPATH='backend'
+.\.venv\Scripts\python.exe -c "import client; import backend.client; print('ok')"
 ```
 
 ## Security Notes
 
-Before publishing this project to GitHub, review and remove sensitive local data:
+This repository is designed to keep private state out of source control:
 
-- API keys in `config.yaml`.
-- Tokens or sessions in `extensions_config.json`.
-- `.env` files.
-- `.deer_flow/` runtime data.
-- `debug.log`.
-- Local checkpoint databases such as `checkpoints.db`.
+- `config.yaml`, `extensions_config.json`, `.env`, `.agentflow/`, `*.db`, and logs are ignored.
+- Example files contain placeholders only.
+- Real tokens must live in environment variables or private local config.
+- Any API key, GitHub token, or LeetCode session that was ever committed, pasted into chat, or stored in a shared file should be rotated on the provider side.
 
-It is recommended to provide a sanitized example config, such as `config.example.yaml`, and keep private configuration files out of version control.
+## Interview Demo
 
-## Development
+See [docs/DEMO.md](docs/DEMO.md) for the recommended demo path: read code, fix a bug, run tests, capture a reusable skill, and recall context in a later session.
 
-Run code formatting or linting according to the project configuration:
-
-```bash
-uv run ruff check .
-```
-
-The development dependency group is declared in `pyproject.toml`.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the next phase: evaluation harness, permission policy, memory/skill approval, and subagent reliability.
 
 ## License
 
-This project includes a `LICENSE` file. See it for licensing details.
+See [LICENSE](LICENSE).

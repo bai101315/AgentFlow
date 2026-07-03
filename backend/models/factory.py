@@ -152,7 +152,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
     # print(f"model_instance: {model_instance}")
 
     # model_class: <class 'langchain_openai.chat_models.base.ChatOpenAI'>
-    # model_settings_from_config: {'model': 'qwen3.5-plus', 'api_key': 'sk-ae17d41aa05c485eb7b85b8d9a0cc606', 'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'max_tokens': 8192, 'temperature': 0.7}
+    # model_settings_from_config: {'model': 'qwen3.5-plus', 'api_key': '***', 'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'max_tokens': 8192, 'temperature': 0.7}
     # print(f"model_class: {model_class}, model_settings_from_config: {model_settings_from_config}")
     
     # build_tracing_callbacks(): 构建链路追踪 / 日志回调（如 LangSmith、自定义日志）

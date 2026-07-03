@@ -19,7 +19,6 @@ import asyncio
 import json
 import logging
 import mimetypes
-import shutil
 import tempfile
 import uuid
 from collections.abc import Generator, Sequence
@@ -41,17 +40,6 @@ from config.extensions_config import ExtensionsConfig, SkillStateConfig, get_ext
 from config.paths import get_paths
 from models import create_chat_model
 from skill.installer import install_skill_from_archive
-
-# from uploads.manager import (
-#     claim_unique_filename,
-#     delete_file_safe,
-#     enrich_file_listing,
-#     ensure_uploads_dir,
-#     get_uploads_dir,
-#     list_files_in_dir,
-#     upload_artifact_url,
-#     upload_virtual_path,
-# )
 
 logger = logging.getLogger(__name__)
 
@@ -1050,87 +1038,10 @@ class DeerFlowClient:
             FileNotFoundError: If any file does not exist.
             ValueError: If any supplied path exists but is not a regular file.
         """
-        from deerflow.utils.file_conversion import CONVERTIBLE_EXTENSIONS, convert_file_to_markdown
-
-        # Validate all files upfront to avoid partial uploads.
-        resolved_files = []
-        seen_names: set[str] = set()
-        has_convertible_file = False
-        for f in files:
-            p = Path(f)
-            if not p.exists():
-                raise FileNotFoundError(f"File not found: {f}")
-            if not p.is_file():
-                raise ValueError(f"Path is not a file: {f}")
-            dest_name = claim_unique_filename(p.name, seen_names)
-            resolved_files.append((p, dest_name))
-            if not has_convertible_file and p.suffix.lower() in CONVERTIBLE_EXTENSIONS:
-                has_convertible_file = True
-
-        uploads_dir = ensure_uploads_dir(thread_id)
-        uploaded_files: list[dict] = []
-
-        conversion_pool = None
-        if has_convertible_file:
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                conversion_pool = None
-            else:
-                import concurrent.futures
-
-                # Reuse one worker when already inside an event loop to avoid
-                # creating a new ThreadPoolExecutor per converted file.
-                conversion_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
-        def _convert_in_thread(path: Path):
-            return asyncio.run(convert_file_to_markdown(path))
-
-        try:
-            for src_path, dest_name in resolved_files:
-                dest = uploads_dir / dest_name
-                shutil.copy2(src_path, dest)
-
-                info: dict[str, Any] = {
-                    "filename": dest_name,
-                    "size": str(dest.stat().st_size),
-                    "path": str(dest),
-                    "virtual_path": upload_virtual_path(dest_name),
-                    "artifact_url": upload_artifact_url(thread_id, dest_name),
-                }
-                if dest_name != src_path.name:
-                    info["original_filename"] = src_path.name
-
-                if src_path.suffix.lower() in CONVERTIBLE_EXTENSIONS:
-                    try:
-                        if conversion_pool is not None:
-                            md_path = conversion_pool.submit(_convert_in_thread, dest).result()
-                        else:
-                            md_path = asyncio.run(convert_file_to_markdown(dest))
-                    except Exception:
-                        logger.warning(
-                            "Failed to convert %s to markdown",
-                            src_path.name,
-                            exc_info=True,
-                        )
-                        md_path = None
-
-                    if md_path is not None:
-                        info["markdown_file"] = md_path.name
-                        info["markdown_path"] = str(uploads_dir / md_path.name)
-                        info["markdown_virtual_path"] = upload_virtual_path(md_path.name)
-                        info["markdown_artifact_url"] = upload_artifact_url(thread_id, md_path.name)
-
-                uploaded_files.append(info)
-        finally:
-            if conversion_pool is not None:
-                conversion_pool.shutdown(wait=True)
-
-        return {
-            "success": True,
-            "files": uploaded_files,
-            "message": f"Successfully uploaded {len(uploaded_files)} file(s)",
-        }
+        raise NotImplementedError(
+            "File upload helpers are not wired in this AgentFlow build. "
+            "Use direct workspace files or implement an uploads manager before calling upload_files()."
+        )
 
     def list_uploads(self, thread_id: str) -> dict:
         """List files in a thread's uploads directory.
@@ -1142,9 +1053,10 @@ class DeerFlowClient:
             Dict with "files" and "count" keys, matching the Gateway API
             ``list_uploaded_files`` response.
         """
-        uploads_dir = get_uploads_dir(thread_id)
-        result = list_files_in_dir(uploads_dir)
-        return enrich_file_listing(result, thread_id)
+        raise NotImplementedError(
+            "File upload helpers are not wired in this AgentFlow build. "
+            "Use direct workspace files or implement an uploads manager before calling list_uploads()."
+        )
 
     def delete_upload(self, thread_id: str, filename: str) -> dict:
         """Delete a file from a thread's uploads directory.
@@ -1161,10 +1073,10 @@ class DeerFlowClient:
             FileNotFoundError: If the file does not exist.
             PermissionError: If path traversal is detected.
         """
-        from deerflow.utils.file_conversion import CONVERTIBLE_EXTENSIONS
-
-        uploads_dir = get_uploads_dir(thread_id)
-        return delete_file_safe(uploads_dir, filename, convertible_extensions=CONVERTIBLE_EXTENSIONS)
+        raise NotImplementedError(
+            "File upload helpers are not wired in this AgentFlow build. "
+            "Use direct workspace files or implement an uploads manager before calling delete_upload()."
+        )
 
     # ------------------------------------------------------------------
     # Public API — artifacts

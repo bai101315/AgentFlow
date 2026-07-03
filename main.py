@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from time import perf_counter
 from typing import Any
 
 import json
@@ -591,27 +592,43 @@ class SessionRecorder:
 
 
 async def main() -> None:
-    # Install file logging first so import-time warnings do not leak to console.
-    _setup_logging("info")
+    startup_started_at = perf_counter()
+    startup_timings: list[tuple[str, float]] = []
 
+    def record_startup_timing(label: str, started_at: float) -> None:
+        startup_timings.append((label, perf_counter() - started_at))
+
+    # Install file logging first so import-time warnings do not leak to console.
+    phase_started_at = perf_counter()
+    _setup_logging("info")
+    record_startup_timing("logging", phase_started_at)
+
+    phase_started_at = perf_counter()
     from langchain_core.messages import HumanMessage
     from langgraph.runtime import Runtime
 
-    from backend.agents import make_lead_agent
-    from backend.agents.checkpointer import make_checkpointer
-    from backend.config import get_app_config
-    from backend.config.app_config import reload_app_config
-    from backend.deer_flow_mcp import initialize_mcp_tools
+    from agents import make_lead_agent
+    from agents.checkpointer import make_checkpointer
+    from config import get_app_config
+    from config.app_config import reload_app_config
+    from deer_flow_mcp import initialize_mcp_tools
+    record_startup_timing("imports", phase_started_at)
 
+    phase_started_at = perf_counter()
     app_config = get_app_config()
     _update_logging_level(app_config.log_level)
+    record_startup_timing("config_load", phase_started_at)
 
+    phase_started_at = perf_counter()
     try:
         await initialize_mcp_tools()
     except Exception as exc:
         print(f"Warning: Failed to initialize MCP tools: {exc}")
+    record_startup_timing("mcp_init", phase_started_at)
 
+    phase_started_at = perf_counter()
     async with make_checkpointer() as checkpointer:
+        record_startup_timing("checkpointer", phase_started_at)
         current_agent = ""
         current_thread_id = ""
         config = {}
@@ -645,11 +662,21 @@ async def main() -> None:
             summary = session_recorder.finalize(exit_reason)
             _print_session_summary(summary)
 
-        def rebuild_agent() -> None:
+        def rebuild_agent() -> tuple[float, list[tuple[str, float]]]:
             nonlocal app_config, current_agent, current_thread_id, config, runtime_signature, agent, session_recorder
 
+            rebuild_started_at = perf_counter()
+            rebuild_timings: list[tuple[str, float]] = []
+
+            def record_rebuild_timing(label: str, started_at: float) -> None:
+                rebuild_timings.append((label, perf_counter() - started_at))
+
+            phase_started_at = perf_counter()
             app_config = reload_app_config()
             _update_logging_level(app_config.log_level)
+            record_rebuild_timing("reload_config", phase_started_at)
+
+            phase_started_at = perf_counter()
             selected_agent = _ensure_config_agent(_get_config_agent_name(app_config))
             selected_thread_id = _ensure_agent_thread_id(selected_agent)
             config = _build_runtime_config(selected_agent, selected_thread_id)
@@ -658,7 +685,13 @@ async def main() -> None:
             config["configurable"]["__pregel_runtime"] = runtime
             _save_last_agent(selected_agent)
             _ensure_agent_memory_file(selected_agent)
+            record_rebuild_timing("agent_config", phase_started_at)
+
+            phase_started_at = perf_counter()
             agent = make_lead_agent(config, checkpointer=checkpointer)
+            record_rebuild_timing("make_lead_agent", phase_started_at)
+
+            phase_started_at = perf_counter()
             current_agent = selected_agent
             current_thread_id = selected_thread_id
             runtime_signature = _runtime_config_signature(selected_agent)
@@ -668,9 +701,20 @@ async def main() -> None:
                     thread_id=selected_thread_id,
                     model_name=_current_model_name(),
                 )
+            record_rebuild_timing("session_recorder", phase_started_at)
+            return perf_counter() - rebuild_started_at, rebuild_timings
 
-        rebuild_agent()
+        initial_agent_build_seconds, initial_agent_build_timings = rebuild_agent()
+        startup_ready_seconds = perf_counter() - startup_started_at
         print(f"Chat started with agent '{current_agent}'. Type 'exit' or 'q' to quit.")
+        print(
+            "Startup ready: "
+            f"{startup_ready_seconds:.3f}s total, "
+            f"{initial_agent_build_seconds:.3f}s agent build."
+        )
+        timing_parts = [f"{label}={seconds:.3f}s" for label, seconds in startup_timings]
+        timing_parts.extend(f"agent.{label}={seconds:.3f}s" for label, seconds in initial_agent_build_timings)
+        print("Startup breakdown: " + ", ".join(timing_parts))
 
         while True:
             try:
@@ -678,8 +722,12 @@ async def main() -> None:
                 selected_agent = _ensure_config_agent(_get_config_agent_name(latest_app_config))
                 latest_signature = _runtime_config_signature(selected_agent)
                 if selected_agent != current_agent or latest_signature != runtime_signature:
-                    rebuild_agent()
-                    print(f"\nSwitched to agent '{current_agent}' from config.")
+                    rebuild_seconds, rebuild_timings = rebuild_agent()
+                    print(f"\nSwitched to agent '{current_agent}' from config ({rebuild_seconds:.3f}s rebuild).")
+                    print(
+                        "Rebuild breakdown: "
+                        + ", ".join(f"{label}={seconds:.3f}s" for label, seconds in rebuild_timings)
+                    )
 
                 user_input = _prompt_line("You >> ")
 

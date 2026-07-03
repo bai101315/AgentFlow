@@ -10,13 +10,13 @@ _SAFE_THREAD_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
 
 
 def _default_local_base_dir() -> Path:
-    """Return the repo-local DeerFlow state directory without relying on cwd."""
+    """Return the repo-local AgentFlow state directory without relying on cwd."""
     # 原来是往前移动四级目录
     # backend_dir = Path(__file__).resolve().parents[4]
     backend_dir = Path(__file__).resolve().parents[2]
 
-    # print(f"Default local base dir: {backend_dir / '.deer-flow'}")
-    return backend_dir / ".deer-flow"
+    # print(f"Default local base dir: {backend_dir / '.agentflow'}")
+    return backend_dir / ".agentflow"
 
 
 def _project_root() -> Path:
@@ -34,7 +34,7 @@ def _join_host_path(base: str, *parts: str) -> str:
     """Join host filesystem path segments while preserving native style.
 
     Docker Desktop on Windows expects bind mount sources to stay in Windows
-    path form (for example ``C:\\repo\\backend\\.deer-flow``).  Using
+    path form (for example ``C:\\repo\\.agentflow``).  Using
     ``Path(base) / ...`` on a POSIX host can accidentally rewrite those paths
     with mixed separators, so this helper preserves the original style.
     """
@@ -60,7 +60,7 @@ def join_host_path(base: str, *parts: str) -> str:
 
 class Paths:
     """
-    Centralized path configuration for DeerFlow application data.
+    Centralized path configuration for AgentFlow application data.
 
     Directory layout (host side):
         {base_dir}/
@@ -80,8 +80,9 @@ class Paths:
 
     BaseDir resolution (in priority order):
         1. Constructor argument `base_dir`
-        2. DEER_FLOW_HOME environment variable
-        3. Repo-local fallback derived from this module path: `{backend_dir}/.deer-flow`
+        2. AGENTFLOW_HOME environment variable
+        3. DEER_FLOW_HOME environment variable, for compatibility with older local setups
+        4. Repo-local fallback derived from this module path: `{repo_root}/.agentflow`
     """
 
     def __init__(self, base_dir: str | Path | None = None) -> None:
@@ -114,8 +115,11 @@ class Paths:
         if self._base_dir is not None:
             return self._base_dir
 
+        if env_home := os.getenv("AGENTFLOW_HOME"):
+            return Path(env_home).resolve()
+
         if env_home := os.getenv("DEER_FLOW_HOME"):
-            # print(f"Using DEER_FLOW_HOME from environment: {Path(env_home).resolve()}")
+            # Compatibility fallback for older local setups.
             return Path(env_home).resolve()
 
         return _default_local_base_dir()
