@@ -1,6 +1,7 @@
 from .app_config import get_app_config
 from .extensions_config import ExtensionsConfig, get_extensions_config
 from .memory_config import MemoryConfig, get_memory_config
+from .observability_config import ObservabilityConfig
 from .paths import Paths, get_paths
 from .prompt_caching_config import PromptCachingConfig, get_prompt_caching_config
 from .skill_evolution_config import SkillEvolutionConfig
@@ -24,6 +25,7 @@ __all__ = [
     "get_extensions_config",
     "MemoryConfig",
     "get_memory_config",
+    "ObservabilityConfig",
     "PromptCachingConfig",
     "get_prompt_caching_config",
     "get_tracing_config",

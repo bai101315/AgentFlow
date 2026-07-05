@@ -343,7 +343,7 @@ def _build_middlewares(
     middlewares.append(ClarificationMiddleware())
     return middlewares
 
-def make_lead_agent(config: RunnableConfig, checkpointer=None):
+def make_lead_agent(config: RunnableConfig, checkpointer=None, custom_middlewares: list[AgentMiddleware] | None = None):
     # Lazy import to avoid circular dependency
     from tools import get_available_tools
     from tools.builtins import setup_agent
@@ -454,7 +454,13 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
         return create_agent(
             model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, **model_overrides),
             tools=tools,
-            middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name, prompt_cache_middleware=prompt_cache_middleware),
+            middleware=_build_middlewares(
+                config,
+                model_name=model_name,
+                agent_name=agent_name,
+                custom_middlewares=custom_middlewares,
+                prompt_cache_middleware=prompt_cache_middleware,
+            ),
             system_prompt=PROMPT_CACHE_PLACEHOLDER,
             checkpointer=checkpointer,
             state_schema=ThreadState,
@@ -464,7 +470,13 @@ def make_lead_agent(config: RunnableConfig, checkpointer=None):
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort, **model_overrides),
         tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
-        middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name, prompt_cache_middleware=prompt_cache_middleware),
+        middleware=_build_middlewares(
+            config,
+            model_name=model_name,
+            agent_name=agent_name,
+            custom_middlewares=custom_middlewares,
+            prompt_cache_middleware=prompt_cache_middleware,
+        ),
         system_prompt=PROMPT_CACHE_PLACEHOLDER,
         checkpointer=checkpointer,
         state_schema=ThreadState

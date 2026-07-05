@@ -15,6 +15,7 @@ from config.extensions_config import ExtensionsConfig
 from config.guardrails_config import GuardrailsConfig, load_guardrails_config_from_dict
 from config.memory_config import MemoryConfig, load_memory_config_from_dict
 from config.model_config import ModelConfig
+from config.observability_config import ObservabilityConfig
 from config.prompt_caching_config import PromptCachingConfig, load_prompt_caching_config_from_dict
 from config.sandbox_config import SandboxConfig
 from config.skill_evolution_config import SkillEvolutionConfig
@@ -45,6 +46,7 @@ class AppConfig(BaseModel):
     
     log_level: str = Field(default="info", description="Logging level for deerflow modules (debug/info/warning/error)")
     token_usage: TokenUsageConfig = Field(default_factory=TokenUsageConfig, description="Token usage tracking configuration")
+    observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig, description="Local observability configuration")
     models: list[ModelConfig] = Field(default_factory=list, description="Available models")
     sandbox: SandboxConfig = Field(description="Sandbox configuration")
     tools: list[ToolConfig] = Field(default_factory=list, description="Available tools")

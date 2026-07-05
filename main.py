@@ -754,6 +754,7 @@ async def main() -> None:
     from config import get_app_config
     from config.app_config import reload_app_config
     from deer_flow_mcp import initialize_mcp_tools
+    from observability import ObservabilityMiddleware, get_observability_recorder
     record_startup_timing("imports", phase_started_at)
 
     phase_started_at = perf_counter()
@@ -776,7 +777,8 @@ async def main() -> None:
         config = {}
         runtime_signature = None
         agent = None
-        session_recorder: SessionRecorder | None = None
+        observability_recorder = get_observability_recorder()
+        current_observability_mode = observability_recorder.config.content_mode
 
         def _current_model_name() -> str | None:
             return config.get("configurable", {}).get("model_name") or config.get("configurable", {}).get("model")
@@ -784,6 +786,7 @@ async def main() -> None:
         def _print_session_summary(summary: dict[str, Any]) -> None:
             print("\nSession summary:")
             print(f"  turns: {summary['turn_count']}")
+            print(f"  trace count: {summary.get('trace_count', summary['turn_count'])}")
             print(f"  total tokens: {summary['total_tokens']}")
             print(f"  input/output: {summary['total_input_tokens']}/{summary['total_output_tokens']}")
             print(f"  billable input tokens: {summary['total_billable_input_tokens']}")
@@ -792,20 +795,76 @@ async def main() -> None:
                 f"{summary['total_prompt_cache_hit_tokens']}/{summary['total_prompt_cache_miss_tokens']}"
             )
             print(f"  prompt cache hit rate: {_format_ratio(summary['prompt_cache_hit_rate'])}")
+            print(f"  tool calls: {summary.get('tool_call_count', 0)}")
+            print(f"  failed tool calls: {summary.get('failed_tool_call_count', 0)}")
             print(
-                "  average per-turn hit rate: "
-                f"{_format_ratio(summary['average_turn_prompt_cache_hit_rate'])}"
+                "  slow/expensive/low-cache traces: "
+                f"{summary.get('slow_trace_count', 0)}/"
+                f"{summary.get('expensive_trace_count', 0)}/"
+                f"{summary.get('low_cache_trace_count', 0)}"
             )
-            print(f"  saved to: {session_recorder.path if session_recorder else 'n/a'}")
+            print(f"  saved to: {_session_log_path(current_thread_id) if current_thread_id else 'n/a'}")
+            print(f"  trace db: {observability_recorder.store.db_path}")
+
+        def _print_trace_failure_hint(trace_payload: dict[str, Any] | None) -> None:
+            if not isinstance(trace_payload, dict):
+                return
+            summary = trace_payload.get("summary")
+            if not isinstance(summary, dict) or not summary.get("had_any_failure"):
+                return
+
+            failed_count = int(summary.get("failed_tool_call_count", 0) or 0)
+            failed_tools = summary.get("failed_tool_names") or []
+            recovered = bool(summary.get("recovered_after_failure"))
+            thread_summary_path = observability_recorder.store.threads_dir / f"{current_thread_id}.json"
+
+            print("\nObservability warning:")
+            print(f"  this turn had {failed_count} failed tool call(s)")
+            if failed_tools:
+                print(f"  failed tools: {', '.join(str(tool) for tool in failed_tools)}")
+            print(f"  recovered: {'yes' if recovered else 'no'}")
+            print(f"  thread summary: {thread_summary_path}")
+            trace_file_path = summary.get("trace_file_path") or trace_payload.get("trace_file_path")
+            if trace_file_path:
+                print(f"  trace file: {trace_file_path}")
 
         def _finalize_session(exit_reason: str) -> None:
-            if session_recorder is None:
+            if not current_thread_id:
                 return
-            summary = session_recorder.finalize(exit_reason)
-            _print_session_summary(summary)
+            observability_recorder.finalize_thread(current_thread_id, exit_reason)
+            payload = observability_recorder.get_thread_summary(current_thread_id)
+            summary = payload.get("summary")
+            if isinstance(summary, dict):
+                _print_session_summary(summary)
+
+        def _handle_observability_command(user_input: str) -> bool:
+            nonlocal current_observability_mode
+            if not user_input.startswith("/obs"):
+                return False
+            parts = user_input.strip().split()
+            command = parts[1].lower() if len(parts) > 1 else "status"
+            if command == "status":
+                payload = observability_recorder.get_thread_summary(current_thread_id) if current_thread_id else {"summary": {}}
+                summary = payload.get("summary", {})
+                print("\nObservability:")
+                print(f"  enabled: {observability_recorder.config.enabled}")
+                print(f"  content mode: {current_observability_mode}")
+                print(f"  db: {observability_recorder.store.db_path}")
+                print(f"  thread summary: {observability_recorder.store.threads_dir / f'{current_thread_id}.json' if current_thread_id else 'n/a'}")
+                print("  detailed trace files: on failure / full mode / anomaly")
+                if summary:
+                    print(f"  total tokens: {summary.get('total_tokens', 0)}")
+                    print(f"  prompt cache hit rate: {_format_ratio(summary.get('prompt_cache_hit_rate'))}")
+                return True
+            if command in {"summary", "full", "off"}:
+                current_observability_mode = command
+                print(f"Observability content mode -> {current_observability_mode}")
+                return True
+            print("Unknown observability command. Use /obs status, /obs summary, /obs full, or /obs off.")
+            return True
 
         def rebuild_agent() -> tuple[float, list[tuple[str, float]]]:
-            nonlocal app_config, current_agent, current_thread_id, config, runtime_signature, agent, session_recorder
+            nonlocal app_config, current_agent, current_thread_id, config, runtime_signature, agent
 
             rebuild_started_at = perf_counter()
             rebuild_timings: list[tuple[str, float]] = []
@@ -830,23 +889,17 @@ async def main() -> None:
             record_rebuild_timing("agent_config", phase_started_at)
 
             phase_started_at = perf_counter()
-            agent = make_lead_agent(config, checkpointer=checkpointer)
+            agent = make_lead_agent(
+                config,
+                checkpointer=checkpointer,
+                custom_middlewares=[ObservabilityMiddleware()],
+            )
             record_rebuild_timing("make_lead_agent", phase_started_at)
 
             phase_started_at = perf_counter()
             current_agent = selected_agent
             current_thread_id = selected_thread_id
             runtime_signature = _runtime_config_signature(selected_agent)
-            if session_recorder is not None and session_recorder.initial_thread_id != selected_thread_id:
-                previous_summary = session_recorder.finalize("agent_switch")
-                _print_session_summary(previous_summary)
-                session_recorder = None
-            if session_recorder is None:
-                session_recorder = SessionRecorder(
-                    agent_name=selected_agent,
-                    thread_id=selected_thread_id,
-                    model_name=_current_model_name(),
-                )
             record_rebuild_timing("session_recorder", phase_started_at)
             return perf_counter() - rebuild_started_at, rebuild_timings
 
@@ -864,6 +917,8 @@ async def main() -> None:
 
         while True:
             try:
+                trace_context = None
+                trace_token = None
                 latest_app_config = get_app_config()
                 selected_agent = _ensure_config_agent(_get_config_agent_name(latest_app_config))
                 latest_signature = _runtime_config_signature(selected_agent)
@@ -879,12 +934,24 @@ async def main() -> None:
 
                 if not user_input:
                     continue
+                if _handle_observability_command(user_input):
+                    continue
                 if user_input.lower() in ("q", "exit"):
                     _finalize_session("user_exit")
                     print("Goodbye!")
                     break
 
                 state = {"messages": [HumanMessage(content=user_input)]}
+                trace_context, trace_token = observability_recorder.start_trace(
+                    thread_id=current_thread_id,
+                    agent_name=current_agent,
+                    model_name=_current_model_name(),
+                    user_input=user_input,
+                    content_mode=current_observability_mode,
+                )
+                config.setdefault("metadata", {})
+                if trace_context is not None:
+                    config["metadata"]["trace_id"] = trace_context.trace_id
                 result = await agent.ainvoke(
                     state,
                     config=config,
@@ -897,21 +964,36 @@ async def main() -> None:
                 if result.get("messages"):
                     last_message = result["messages"][-1]
                     print(f"\n{GREEN}{BOLD}{current_agent}{RESET}: {last_message.content}")
-                    if session_recorder is not None:
-                        session_recorder.record_turn(
-                            agent_name=current_agent,
-                            thread_id=current_thread_id,
-                            model_name=_current_model_name(),
-                            user_input=user_input,
-                            assistant_output=str(last_message.content),
-                            usage=_extract_usage_stats(last_message),
-                        )
+                    trace_payload = observability_recorder.end_trace(
+                        trace_context,
+                        trace_token,
+                        assistant_output=str(last_message.content),
+                        completed=True,
+                    )
+                    _print_trace_failure_hint(trace_payload)
+                else:
+                    trace_payload = observability_recorder.end_trace(
+                        trace_context,
+                        trace_token,
+                        assistant_output="",
+                        completed=True,
+                    )
+                    _print_trace_failure_hint(trace_payload)
 
             except KeyboardInterrupt:
                 _finalize_session("keyboard_interrupt")
                 print("Goodbye!")
                 break
             except Exception as exc:
+                if trace_context is not None:
+                    trace_payload = observability_recorder.end_trace(
+                        trace_context,
+                        trace_token,
+                        assistant_output="",
+                        completed=False,
+                        failure_reason=f"{exc.__class__.__name__}: {exc}",
+                    )
+                    _print_trace_failure_hint(trace_payload)
                 print(f"\nError: {exc}")
                 import traceback
 
