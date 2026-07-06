@@ -38,6 +38,8 @@ async def task_tool(
     - **general-purpose**: A capable agent for complex, multi-step tasks that require
       both exploration and action. Use when the task requires complex reasoning,
       multiple dependent steps, or would benefit from isolated context.
+    - **code**: Code-focused specialist for reading, editing, tracing implementations,
+      running focused tests, and checking diffs.
     - **bash**: Command execution specialist for running bash commands. This is only
       available when host bash is explicitly allowed or when using an isolated shell
       sandbox such as `AioSandboxProvider`.

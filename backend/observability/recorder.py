@@ -511,7 +511,7 @@ class ObservabilityRecorder:
 
     @staticmethod
     def _build_failure_summary(*, context: TraceContext, completed: bool) -> dict[str, Any]:
-        failed_calls = [call for call in context.tool_calls if call.get("status") != "ok"]
+        failed_calls = [call for call in context.tool_calls if _tool_call_failed(call)]
         failed_tool_names: list[str] = []
         seen_tool_names: set[str] = set()
         failure_events: list[dict[str, Any]] = []
@@ -618,6 +618,28 @@ class ObservabilityRecorder:
         target["cache_signal_available"] = bool(
             target["prompt_cache_hit_tokens"] or target["prompt_cache_miss_tokens"] or target.get("cache_read_input_tokens")
         )
+
+
+def _tool_call_failed(call: dict[str, Any]) -> bool:
+    status = str(call.get("status") or "ok").lower()
+    if status not in {"ok", "success"}:
+        return True
+    return _tool_result_preview_looks_failed(call.get("result_preview"))
+
+
+def _tool_result_preview_looks_failed(result_preview: Any) -> bool:
+    if result_preview is None:
+        return False
+    text = str(result_preview).lstrip().lower()
+    return text.startswith(
+        (
+            "error:",
+            "task failed.",
+            "task timed out.",
+            "task polling timed out",
+            "task cancelled",
+        )
+    )
 
 
 def _load_config() -> ObservabilityConfig:

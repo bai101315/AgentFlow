@@ -128,7 +128,8 @@ memory:
   max_injection_tokens: 2000
 
 subagents:
-  timeout_seconds: 60
+  timeout_seconds: 300
+  max_turns: 100
 
 checkpointer:
   type: sqlite

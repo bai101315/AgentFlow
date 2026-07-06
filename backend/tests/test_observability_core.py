@@ -267,6 +267,67 @@ def test_recovered_failure_is_recorded_in_trace_and_thread_summary(tmp_path):
     ]
 
 
+def test_success_status_is_not_counted_as_failure_unless_result_reports_error(tmp_path):
+    root = tmp_path / ".agentflow"
+    store = ObservabilityStore(base_dir=root)
+    recorder = ObservabilityRecorder(
+        config=ObservabilityConfig(enabled=True, content_mode="summary"),
+        store=store,
+        bootstrap_legacy=False,
+    )
+
+    context, token = recorder.start_trace(
+        thread_id="thread-success-status",
+        agent_name="tester",
+        model_name="deepseek-v4",
+        user_input="Inspect project",
+        content_mode="summary",
+    )
+    assert context is not None
+    recorder.record_tool_call(
+        trace_id=context.trace_id,
+        tool_call_id="call-1",
+        tool_name="ls",
+        args_value={"path": "backend"},
+        result_value="backend/observability/recorder.py",
+        status="success",
+        error_type="tool_result_error",
+        elapsed_ms=10,
+    )
+    recorder.record_tool_call(
+        trace_id=context.trace_id,
+        tool_call_id="call-2",
+        tool_name="task",
+        args_value={"description": "analyze"},
+        result_value="Task failed. Error: Recursion limit of 10 reached without hitting a stop condition.",
+        status="success",
+        error_type="tool_result_error",
+        elapsed_ms=1000,
+    )
+
+    payload = recorder.end_trace(
+        context,
+        token,
+        assistant_output="Recovered with direct inspection.",
+        completed=True,
+    )
+    assert payload is not None
+
+    failure_summary = payload["summary"]
+    assert failure_summary["had_any_failure"] is True
+    assert failure_summary["failed_tool_call_count"] == 1
+    assert failure_summary["failed_tool_names"] == ["task"]
+    assert failure_summary["failure_events"] == [
+        {
+            "tool_name": "task",
+            "tool_call_id": "call-2",
+            "error_type": "tool_result_error",
+            "elapsed_ms": 1000,
+            "status": "success",
+        }
+    ]
+
+
 def test_unrecovered_failure_stays_visible(tmp_path):
     root = tmp_path / ".agentflow"
     store = ObservabilityStore(base_dir=root)

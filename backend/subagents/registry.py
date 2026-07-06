@@ -9,6 +9,18 @@ from subagents.config import SubagentConfig
 
 logger = logging.getLogger(__name__)
 
+_SUBAGENT_ALIASES = {
+    "coding_agent": "code",
+    "coding-agent": "code",
+    "code-agent": "code",
+    "coding": "code",
+}
+
+
+def _normalize_subagent_name(name: str) -> str:
+    return _SUBAGENT_ALIASES.get(name, name)
+
+
 def get_subagent_config(name: str) -> SubagentConfig | None:
     """Get a subagent configuration by name, with config.yaml overrides applied.
 
@@ -19,7 +31,8 @@ def get_subagent_config(name: str) -> SubagentConfig | None:
         SubagentConfig if found (with any config.yaml overrides applied), None otherwise.
     """
     
-    config = BUILTIN_SUBAGENTS.get(name)
+    canonical_name = _normalize_subagent_name(name)
+    config = BUILTIN_SUBAGENTS.get(canonical_name)
     if config is None:
         return None
     
@@ -27,14 +40,14 @@ def get_subagent_config(name: str) -> SubagentConfig | None:
     from config.subagents_config import get_subagents_app_config
 
     app_config = get_subagents_app_config()
-    effective_timeout = app_config.get_timeout_for(name)
-    effective_max_turns = app_config.get_max_turns_for(name, config.max_turns)
+    effective_timeout = app_config.get_timeout_for(canonical_name, config.timeout_seconds)
+    effective_max_turns = app_config.get_max_turns_for(canonical_name, config.max_turns)
 
     overrides = {}
     if effective_timeout != config.timeout_seconds:
         logger.debug(
             "Subagent '%s': timeout overridden by config.yaml (%ss -> %ss)",
-            name,
+            canonical_name,
             config.timeout_seconds,
             effective_timeout,
         )
@@ -42,7 +55,7 @@ def get_subagent_config(name: str) -> SubagentConfig | None:
     if effective_max_turns != config.max_turns:
         logger.debug(
             "Subagent '%s': max_turns overridden by config.yaml (%s -> %s)",
-            name,
+            canonical_name,
             config.max_turns,
             effective_max_turns,
         )

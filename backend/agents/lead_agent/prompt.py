@@ -166,13 +166,22 @@ def _build_subagent_section(max_concurrent: int) -> str:
     # 构建具有动态并发限制的子代理系统提示部分。
 
     n = max_concurrent
-    bash_available = "bash" in get_available_subagent_names()
-    available_subagents = (
-        "- **general-purpose**: For ANY non-trivial task - web research, code exploration, file operations, analysis, etc.\n- **bash**: For command execution (git, build, test, deploy operations)"
-        if bash_available
-        else "- **general-purpose**: For ANY non-trivial task - web research, code exploration, file operations, analysis, etc.\n"
-        "- **bash**: Not available in the current sandbox configuration. Use direct file/web tools or switch to AioSandboxProvider for isolated shell access."
-    )
+    available_subagent_names = set(get_available_subagent_names())
+    bash_available = "bash" in available_subagent_names
+    subagent_lines = [
+        "- **general-purpose**: For ANY non-trivial task - web research, broad exploration, file operations, analysis, etc.",
+    ]
+    if "code" in available_subagent_names:
+        subagent_lines.append(
+            "- **code**: For code-focused tasks - reading, editing, tracing implementations, running focused tests, and checking diffs."
+        )
+    if bash_available:
+        subagent_lines.append("- **bash**: For command execution (git, build, test, deploy operations)")
+    else:
+        subagent_lines.append(
+            "- **bash**: Not available in the current sandbox configuration. Use direct file/web tools or switch to AioSandboxProvider for isolated shell access."
+        )
+    available_subagents = "\n".join(subagent_lines)
 
     direct_tool_examples = "bash, ls, read_file, web_search, etc." if bash_available else "ls, read_file, web_search, etc."
     direct_execution_example = (

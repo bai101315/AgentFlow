@@ -40,18 +40,22 @@ class SubagentsAppConfig(BaseModel):
         description="Per-agent configuration overrides keyed by agent name",
     )
 
-    def get_timeout_for(self, agent_name: str) -> int:
+    def get_timeout_for(self, agent_name: str, builtin_default: int) -> int:
         """Get the effective timeout for a specific agent.
 
         Args:
             agent_name: The name of the subagent.
+            builtin_default: The timeout defined by the subagent itself.
 
         Returns:
-            The timeout in seconds, using per-agent override if set, otherwise global default.
+            The timeout in seconds, preferring per-agent override, then the
+            subagent's own default, then the global default.
         """
         override = self.agents.get(agent_name)
         if override is not None and override.timeout_seconds is not None:
             return override.timeout_seconds
+        if builtin_default is not None:
+            return builtin_default
         return self.timeout_seconds
 
     def get_max_turns_for(self, agent_name: str, builtin_default: int) -> int:
@@ -59,9 +63,11 @@ class SubagentsAppConfig(BaseModel):
         override = self.agents.get(agent_name)
         if override is not None and override.max_turns is not None:
             return override.max_turns
+        if builtin_default is not None:
+            return builtin_default
         if self.max_turns is not None:
             return self.max_turns
-        return builtin_default
+        return 50
 
 
 _subagents_config: SubagentsAppConfig = SubagentsAppConfig()

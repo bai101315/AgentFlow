@@ -227,21 +227,46 @@ def _tool_result_value(result: ToolMessage | Command) -> Any:
 
 def _tool_result_status(result: ToolMessage | Command) -> str:
     if isinstance(result, ToolMessage):
-        return str(getattr(result, "status", "ok") or "ok")
+        return _normalize_tool_status(getattr(result, "status", "ok"))
     update = getattr(result, "update", None)
     if isinstance(update, dict):
         messages = update.get("messages")
         if isinstance(messages, list):
             for message in messages:
                 if isinstance(message, ToolMessage):
-                    return str(getattr(message, "status", "ok") or "ok")
+                    return _normalize_tool_status(getattr(message, "status", "ok"))
     return "ok"
 
 
 def _tool_result_error_type(result: ToolMessage | Command) -> str | None:
-    if _tool_result_status(result) == "ok":
+    if _tool_result_status(result) == "ok" and not _tool_result_looks_failed(result):
         return None
     return "tool_result_error"
+
+
+def _normalize_tool_status(status: Any) -> str:
+    value = str(status or "ok").lower()
+    if value in {"ok", "success"}:
+        return "ok"
+    return value
+
+
+def _tool_result_looks_failed(result: ToolMessage | Command) -> bool:
+    value = _tool_result_value(result)
+    if isinstance(value, list):
+        text = "\n".join(str(item) for item in value)
+    else:
+        text = str(value)
+    text = text.lstrip().lower()
+    return text.startswith(
+        (
+            "error:",
+            "task failed.",
+            "task timed out.",
+            "task polling timed out",
+            "task cancelled",
+        )
+    )
 
 
 def _utc_now_iso() -> str:
