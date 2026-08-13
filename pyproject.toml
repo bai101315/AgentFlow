@@ -1,7 +1,7 @@
 [project]
 name = "deer-flow"
 version = "0.1.0"
-description = "LangGraph-based AI agent system with sandbox execution capabilities"
+description = "LangGraph-based AI agent system"  # [DEPRECATED] sandbox execution capabilities removed
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -20,6 +20,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "prompt-toolkit>=3.0.52",
     "aiosqlite>=0.22.1",
+    "jinja2>=3.1.6",
 ]
 
 [dependency-groups]

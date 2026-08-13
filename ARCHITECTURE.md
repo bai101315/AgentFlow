@@ -12,7 +12,7 @@ The CLI in `main.py` creates or resumes the configured agent and stores runtime 
 
 Tools are configured by group in `config.yaml`, then loaded at runtime. Local file tools, bash, web search, built-in tools, MCP tools, and subagent tools are composed through `backend/tools/tools.py`.
 
-MCP tools can be deferred behind `tool_search`, so the model sees a small discovery surface instead of every external schema. Host bash is disabled by default in example config because the local provider is not a strong sandbox boundary.
+MCP tools can be deferred behind `tool_search`, so the model sees a small discovery surface instead of every external schema. <!-- [DEPRECATED] sandbox boundary mention removed: Host bash is disabled by default in example config because the local provider is not a strong sandbox boundary. -->
 
 ## 3. Memory
 

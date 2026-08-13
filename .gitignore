@@ -59,7 +59,8 @@ skills/custom/*
 .pnpm-store
 
 # Local artifacts
-sandbox_image_cache.tar
+# [DEPRECATED] sandbox image cache removed
+# sandbox_image_cache.tar
 study_md/
 web/
 backend/Dockerfile.langgraph

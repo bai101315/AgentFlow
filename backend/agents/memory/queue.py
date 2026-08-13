@@ -110,19 +110,16 @@ class MemoryUpdateQueue:
 
     def _process_queue(self) -> None:
         """Process all queued conversation contexts."""
-        # Import here to avoid circular dependency
-        from agents.memory.updater import MemoryUpdater
-
         with self._lock:
             # 如果正在处理，直接重新设置定时器，等当前处理完再处理新的
             if self._processing:
                 # Already processing, reschedule
                 self._reset_timer()
                 return
-            
+
             if not self._queue:
                 return
-            
+
             self._processing = True
             # 开始执行这一批，把当前队列中的内容复制出来，清空队列，
             # 这样在处理的过程中如果有新的加入，就会进入新的批次，不会干扰当前批次的处理
@@ -130,38 +127,83 @@ class MemoryUpdateQueue:
             self._queue.clear()
             self._timer = None
 
-        logger.info("Processing %d queued memory updates", len(contexts_to_process))
-
         try:
-            updater = MemoryUpdater()
-
-            for context in contexts_to_process:
-                try:
-                    logger.info("Updating memory for thread %s", context.thread_id)
-
-                    success = updater.update_memory(
-                        messages=context.messages,
-                        thread_id=context.thread_id,
-                        agent_name=context.agent_name,
-                        correction_detected=context.correction_detected,
-                        reinforcement_detected=context.reinforcement_detected,
-                    )
-                    if success:
-                        logger.info("Memory updated successfully for thread %s", context.thread_id)
-                    else:
-                        logger.warning("Memory update skipped/failed for thread %s", context.thread_id)
-
-                except Exception as e:
-                    logger.error("Error updating memory for thread %s: %s", context.thread_id, e)
-                
-                # Small delay between updates to avoid rate limiting
-                # 如果有很多任务，每处理完一次就休息0.5s，避免过快处理完所有任务导致的速率限制问题
-                if len(contexts_to_process) > 1:
-                    time.sleep(0.5)
-        # finally 的作用：无论上面的代码是成功执行完、还是中途报错跳出，这一块代码一定会执行，保证状态能被正确重置。
+            self._process_contexts(contexts_to_process)
         finally:
             with self._lock:
                 self._processing = False
+
+    def _process_contexts(self, contexts_to_process: list[ConversationContext]) -> None:
+        """Run memory updates for a batch of contexts."""
+        # Import here to avoid circular dependency
+        from agents.memory.updater import MemoryUpdater
+
+        logger.info("Processing %d queued memory updates", len(contexts_to_process))
+
+        updater = MemoryUpdater()
+
+        for context in contexts_to_process:
+            try:
+                logger.info("Updating memory for thread %s", context.thread_id)
+
+                success = updater.update_memory(
+                    messages=context.messages,
+                    thread_id=context.thread_id,
+                    agent_name=context.agent_name,
+                    correction_detected=context.correction_detected,
+                    reinforcement_detected=context.reinforcement_detected,
+                )
+                if success:
+                    logger.info("Memory updated successfully for thread %s", context.thread_id)
+                else:
+                    logger.warning("Memory update skipped/failed for thread %s", context.thread_id)
+
+            except Exception as e:
+                logger.error("Error updating memory for thread %s: %s", context.thread_id, e)
+
+            # Small delay between updates to avoid rate limiting
+            # 如果有很多任务，每处理完一次就休息0.5s，避免过快处理完所有任务导致的速率限制问题
+            if len(contexts_to_process) > 1:
+                time.sleep(0.5)
+
+    def flush(self, timeout: float = 60.0) -> int:
+        """Synchronously process all pending contexts (for graceful shutdown).
+
+        The debounce timer is a daemon thread: if the process exits before the
+        timer fires, queued memory updates are lost and memory.json is never
+        written.  Call this before shutdown so pending updates are flushed to
+        disk.  If a batch is already being processed, waits for it to finish
+        and then drains anything queued in the meantime.
+
+        Returns:
+            The number of contexts processed.
+        """
+        deadline = time.time() + timeout
+        while True:
+            with self._lock:
+                if self._timer is not None:
+                    self._timer.cancel()
+                    self._timer = None
+                if self._processing:
+                    in_flight = True
+                    pending: list[ConversationContext] = []
+                else:
+                    in_flight = False
+                    pending = self._queue.copy()
+                    self._queue.clear()
+
+            if in_flight:
+                if time.time() >= deadline:
+                    logger.warning("Memory flush timed out waiting for in-flight batch")
+                    return 0
+                time.sleep(0.05)
+                continue
+
+            if not pending:
+                return 0
+
+            self._process_contexts(pending)
+            return len(pending)
 
 
 # Global singleton instance

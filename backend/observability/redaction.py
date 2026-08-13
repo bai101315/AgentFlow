@@ -5,7 +5,6 @@ import json
 import re
 from typing import Any
 
-
 _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"sk-[A-Za-z0-9_\-]{8,}"),
     re.compile(r"ghp_[A-Za-z0-9]{10,}"),

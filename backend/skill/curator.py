@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from typing import Any, Callable
 
 from config.self_improvement_config import CuratorConfig
+from skill.action_parsing import parse_actions_json
 from skill.manager import get_custom_skill_dir, get_custom_skills_dir, validate_skill_name
 from skill.usage import is_curator_managed, read_usage, write_usage
 
@@ -181,12 +182,6 @@ def collect_consolidation_candidates() -> list[dict[str, Any]]:
     return candidates
 
 
-def _parse_actions(raw: str) -> list[dict[str, Any]]:
-    data = json.loads(raw.strip())
-    actions = data if isinstance(data, list) else data.get("actions", [])
-    return [action for action in actions if isinstance(action, dict)] if isinstance(actions, list) else []
-
-
 def _model_consolidation_actions(config: CuratorConfig, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     from langchain_core.messages import HumanMessage, SystemMessage
     from models import create_chat_model
@@ -198,7 +193,7 @@ def _model_consolidation_actions(config: CuratorConfig, candidates: list[dict[st
             HumanMessage(content=json.dumps({"skills": candidates}, ensure_ascii=False)),
         ]
     )
-    return _parse_actions(str(getattr(response, "content", "")))
+    return parse_actions_json(str(getattr(response, "content", "")))
 
 
 async def apply_consolidation_actions(actions: list[dict[str, Any]], *, max_actions: int = 8) -> list[str]:

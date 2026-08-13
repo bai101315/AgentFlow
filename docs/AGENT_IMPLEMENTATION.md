@@ -40,7 +40,7 @@ backend/agents/
     ├── deferred_tool_filter_middleware.py # 延迟工具过滤
     ├── dangling_tool_call_middleware.py   # 孤立 ToolMessage 修复
     ├── llm_error_handling_middleware.py   # LLM 错误重试
-    ├── sandbox_audit_middleware.py        # 沙箱审计
+    <!-- ├── sandbox_audit_middleware.py        # [DEPRECATED] 沙箱审计已移除 -->
     ├── thread_data_middleware.py          # 线程数据注入
     └── uploads_middleware.py              # 上传文件处理
 ```
@@ -205,7 +205,7 @@ MemoryMiddleware.after_agent()
 
 ```python
 class ThreadState(AgentState):
-    sandbox: SandboxState       # { sandbox_id: str }
+    # sandbox: SandboxState       # [DEPRECATED] sandbox removed
     thread_data: ThreadDataState # { workspace_path, uploads_path, outputs_path }
     title: str
     artifacts: list[str]        # 带 reducer（自动去重合并）

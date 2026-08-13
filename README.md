@@ -24,7 +24,9 @@ The current product surface is intentionally small: a local CLI and an embedded 
 - Session search: index user and assistant turns into SQLite FTS for cross-session recall.
 - Skills: load public/custom skills and update custom skills through `skill_manage` with validation and history.
 - Middleware: compose memory updates, session indexing, loop detection, prompt caching, clarification, and tool error handling.
+<!-- [DEPRECATED] sandbox configuration removed:
 - Local sandbox mapping: run local file operations against controlled workspace paths; host bash is opt-in and should remain disabled for demos.
+-->
 
 ## Project Structure
 
@@ -80,6 +82,7 @@ tool_groups:
 
 For a safe showcase configuration, keep host bash disabled:
 
+<!-- [DEPRECATED] sandbox configuration removed:
 ```yaml
 sandbox:
   use: sandbox.local:LocalSandboxProvider
@@ -87,6 +90,7 @@ sandbox:
 ```
 
 Enable host bash only in a fully trusted local environment.
+-->
 
 ## Usage
 

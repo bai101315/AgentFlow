@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -21,13 +20,12 @@ from langgraph.runtime import Runtime
 from config import get_app_config
 from config.self_improvement_config import BackgroundReviewConfig
 from models import create_chat_model
+from skill.action_parsing import parse_actions_json
 from tools.skill_manage_tool import _skill_manage_impl
 
 logger = logging.getLogger(__name__)
 
 BACKGROUND_REVIEW_ORIGIN = "background_review"
-
-_JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", re.IGNORECASE)
 
 _REVIEW_SYSTEM_PROMPT = """You are a background self-improvement reviewer.
 You are isolated from the foreground conversation and must only propose durable skill updates.
@@ -133,21 +131,6 @@ def _recent_transcript(messages: list[Any], *, max_messages: int) -> str:
     return "\n\n".join(lines)
 
 
-def _parse_actions(raw: str) -> list[dict[str, Any]]:
-    raw = raw.strip()
-    match = _JSON_BLOCK_RE.search(raw)
-    if match:
-        raw = match.group(1)
-    data = json.loads(raw)
-    if isinstance(data, list):
-        actions = data
-    else:
-        actions = data.get("actions", [])
-    if not isinstance(actions, list):
-        return []
-    return [action for action in actions if isinstance(action, dict)]
-
-
 async def apply_review_actions(
     actions: list[dict[str, Any]],
     *,
@@ -247,7 +230,7 @@ class BackgroundReviewMiddleware(AgentMiddleware[AgentState]):
                 ),
             ]
         )
-        return _parse_actions(str(getattr(response, "content", "")))
+        return parse_actions_json(str(getattr(response, "content", "")))
 
     def _run_review(self, *, thread_id: str, messages: list[Any], config: BackgroundReviewConfig) -> None:
         try:

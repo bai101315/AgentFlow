@@ -1,28 +1,34 @@
-﻿import asyncio
+﻿import argparse
+import asyncio
+import json
 import logging
 import re
+import socket
 import sys
+import threading
 import uuid
-from pathlib import Path
+import webbrowser
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-import json
-
-from dotenv import load_dotenv
 import yaml
+from dotenv import load_dotenv
 
 from until import *
 
-# try:
-#     from prompt_toolkit import PromptSession
-#     from prompt_toolkit.history import InMemoryHistory
+try:
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.formatted_text import ANSI
+    from prompt_toolkit.history import InMemoryHistory
 
-#     _HAS_PROMPT_TOOLKIT = True
-# except ImportError:
-#     _HAS_PROMPT_TOOLKIT = False
+    _HAS_PROMPT_TOOLKIT = True
+    _SESSION = PromptSession(history=InMemoryHistory(), enable_history_search=False)
+except ImportError:
+    _HAS_PROMPT_TOOLKIT = False
+    _SESSION = None
 
 load_dotenv()
 
@@ -41,6 +47,8 @@ _SOUL_REQUIRED_HEADERS = (
     "## Continuous Improvement",
 )
 _DEFAULT_AGENT_ALIASES = {"", "default", "test", "none", "null"}
+_OBSERVABILITY_HOST = "127.0.0.1"
+_OBSERVABILITY_PORT = 8081
 
 
 def _logging_level_from_config(name: str) -> int:
@@ -73,13 +81,57 @@ def _update_logging_level(log_level: str) -> None:
         handler.setLevel(level)
 
 
+def _port_is_open(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.2)
+        return sock.connect_ex((host, port)) == 0
+
+
+def _start_observability_web() -> None:
+    """Start the local observability UI once and open it in the default browser."""
+    url = f"http://{_OBSERVABILITY_HOST}:{_OBSERVABILITY_PORT}/"
+    if not _port_is_open(_OBSERVABILITY_HOST, _OBSERVABILITY_PORT):
+        try:
+            import uvicorn
+            from observability.web.app import app as observability_app
+
+            def run_server() -> None:
+                uvicorn.run(
+                    observability_app,
+                    host=_OBSERVABILITY_HOST,
+                    port=_OBSERVABILITY_PORT,
+                    log_level="warning",
+                    access_log=False,
+                )
+
+            thread = threading.Thread(target=run_server, name="observability-web", daemon=True)
+            thread.start()
+            for _ in range(25):
+                if _port_is_open(_OBSERVABILITY_HOST, _OBSERVABILITY_PORT):
+                    break
+                import time
+
+                time.sleep(0.1)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("Failed to start observability web UI: %s", exc)
+            return
+
+    try:
+        webbrowser.open(url, new=2)
+        print(f"Observability UI: {url}")
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Failed to open observability UI: %s", exc)
+
+
 # Ensure local backend modules are importable when running from repo root.
 BACKEND_ROOT = Path(__file__).resolve().parent / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 
-def _prompt_line(label: str) -> str:
+async def _prompt_line(label: str) -> str:
+    if _HAS_PROMPT_TOOLKIT and _SESSION is not None:
+        return (await _SESSION.prompt_async(ANSI(f"{CYAN}{BOLD}{label}{RESET}"))).strip()
     return input(f"{CYAN}{BOLD}{label}{RESET}").strip()
 
 
@@ -94,6 +146,23 @@ def _save_last_agent(agent_name: str) -> None:
         _last_agent_file().write_text(agent_name, encoding="utf-8")
     except Exception:
         pass
+
+
+def _flush_memory_queue() -> None:
+    """Flush pending memory updates on shutdown so memory.json is written.
+
+    The memory debounce timer runs on a daemon thread: if the process exits
+    before the timer fires, queued updates would be lost and no memory file
+    would ever be written.  Call this on every exit path.
+    """
+    try:
+        from agents.memory.queue import get_memory_queue
+
+        processed = get_memory_queue().flush()
+        if processed:
+            print(f"Memory updates flushed: {processed} pending update(s) saved.")
+    except Exception as exc:
+        print(f"Warning: failed to flush memory updates: {exc}")
 
 
 def _agent_threads_file() -> Path:
@@ -140,6 +209,21 @@ def _ensure_agent_thread_id(agent_name: str | None) -> str:
     data[name] = thread_id
     _save_agent_threads_map(data)
     return thread_id
+
+
+def _rotate_agent_thread(agent_name: str | None) -> str:
+    """Create a fresh thread for the agent and make it the default one.
+
+    Used by ``--new-session``: the new thread_id becomes the agent's default
+    in agent_threads.yaml, so a later plain start (``--continue``) resumes the
+    new session instead of the old one.
+    """
+    name = _normalize_agent_name(agent_name)
+    data = _load_agent_threads_map()
+    new_thread_id = f"{name}-{uuid.uuid4().hex[:8]}"
+    data[name] = new_thread_id
+    _save_agent_threads_map(data)
+    return new_thread_id
 
 
 def _ensure_agent_memory_file(agent_name: str) -> None:
@@ -733,9 +817,10 @@ class SessionRecorder:
         )
 
 
-async def main() -> None:
+async def main(args: argparse.Namespace) -> None:
     startup_started_at = perf_counter()
     startup_timings: list[tuple[str, float]] = []
+    fresh_session_created = False
 
     def record_startup_timing(label: str, started_at: float) -> None:
         startup_timings.append((label, perf_counter() - started_at))
@@ -864,7 +949,7 @@ async def main() -> None:
             return True
 
         def rebuild_agent() -> tuple[float, list[tuple[str, float]]]:
-            nonlocal app_config, current_agent, current_thread_id, config, runtime_signature, agent
+            nonlocal app_config, current_agent, current_thread_id, config, runtime_signature, agent, fresh_session_created
 
             rebuild_started_at = perf_counter()
             rebuild_timings: list[tuple[str, float]] = []
@@ -879,6 +964,9 @@ async def main() -> None:
 
             phase_started_at = perf_counter()
             selected_agent = _ensure_config_agent(_get_config_agent_name(app_config))
+            if args.new_session and not fresh_session_created:
+                fresh_session_created = True
+                _rotate_agent_thread(selected_agent)
             selected_thread_id = _ensure_agent_thread_id(selected_agent)
             config = _build_runtime_config(selected_agent, selected_thread_id)
             runtime_agent_name = config["configurable"].get("agent_name")
@@ -904,8 +992,13 @@ async def main() -> None:
             return perf_counter() - rebuild_started_at, rebuild_timings
 
         initial_agent_build_seconds, initial_agent_build_timings = rebuild_agent()
+        _start_observability_web()
         startup_ready_seconds = perf_counter() - startup_started_at
         print(f"Chat started with agent '{current_agent}'. Type 'exit' or 'q' to quit.")
+        if args.new_session and fresh_session_created:
+            print(f"Session mode: NEW session ({current_thread_id})")
+        else:
+            print(f"Session mode: continuing session ({current_thread_id})")
         print(
             "Startup ready: "
             f"{startup_ready_seconds:.3f}s total, "
@@ -930,7 +1023,7 @@ async def main() -> None:
                         + ", ".join(f"{label}={seconds:.3f}s" for label, seconds in rebuild_timings)
                     )
 
-                user_input = _prompt_line("You >> ")
+                user_input = await _prompt_line("You >> ")
 
                 if not user_input:
                     continue
@@ -938,6 +1031,7 @@ async def main() -> None:
                     continue
                 if user_input.lower() in ("q", "exit"):
                     _finalize_session("user_exit")
+                    _flush_memory_queue()
                     print("Goodbye!")
                     break
 
@@ -982,6 +1076,7 @@ async def main() -> None:
 
             except KeyboardInterrupt:
                 _finalize_session("keyboard_interrupt")
+                _flush_memory_queue()
                 print("Goodbye!")
                 break
             except Exception as exc:
@@ -1001,4 +1096,18 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="AgentFlow CLI")
+    session_group = parser.add_mutually_exclusive_group()
+    session_group.add_argument(
+        "--new-session",
+        action="store_true",
+        help="Start a brand-new conversation session (creates a new thread_id)",
+    )
+    session_group.add_argument(
+        "--continue",
+        dest="continue_session",
+        action="store_true",
+        help="Resume the agent's most recent session (default behavior)",
+    )
+    args = parser.parse_args()
+    asyncio.run(main(args))

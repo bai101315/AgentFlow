@@ -1,3 +1,4 @@
+import logging
 import posixpath
 import re
 import shlex
@@ -37,6 +38,8 @@ _DEFAULT_GLOB_MAX_RESULTS = 200
 _MAX_GLOB_MAX_RESULTS = 1000
 _DEFAULT_GREP_MAX_RESULTS = 100
 _MAX_GREP_MAX_RESULTS = 500
+
+logger = logging.getLogger(__name__)
 
 
 def _get_skills_container_path() -> str:
@@ -112,6 +115,44 @@ def _resolve_skills_path(path: str) -> str:
 
     relative = path[len(skills_container) :].lstrip("/")
     return _join_path_preserving_style(skills_host, relative)
+
+
+def _record_skill_use(requested_path: str) -> None:
+    """Record skill usage when the agent reads a file inside a skill directory.
+
+    The agent uses skills through progressive loading (reading the skill's
+    SKILL.md and support files), so a successful read of a path under
+    ``skills/<category>/<name>/`` is the "use" signal that keeps the skill's
+    ``last_activity_at`` fresh for curator lifecycle decisions.  Failures are
+    logged and swallowed so usage tracking never breaks a file read.
+    """
+    if not requested_path:
+        return
+    skills_container = _get_skills_container_path()
+    skills_host = _get_skills_host_path()
+
+    prefix: str | None = None
+    if skills_container and (requested_path == skills_container or requested_path.startswith(f"{skills_container}/")):
+        prefix = skills_container
+    elif skills_host and (requested_path == skills_host or requested_path.startswith(f"{skills_host}/")):
+        prefix = str(skills_host)
+    if prefix is None:
+        return
+
+    parts = requested_path[len(prefix) :].lstrip("/").split("/")
+    if len(parts) < 2 or parts[0] not in ("public", "custom"):
+        return
+    name = parts[1]
+    if not name or name.startswith("."):
+        # Skip bookkeeping dirs (.archive, .history) and files (.usage.json).
+        return
+
+    try:
+        from skill.usage import record_skill_access
+
+        record_skill_access(name, access="use")
+    except Exception:
+        logger.debug("Failed to record skill usage for %s", name, exc_info=True)
 
 
 def _is_acp_workspace_path(path: str) -> bool:
@@ -1238,6 +1279,7 @@ def read_file_tool(
         content = sandbox.read_file(path)
         if not content:
             return "(empty)"
+        _record_skill_use(requested_path)
         if start_line is not None and end_line is not None:
             content = "\n".join(content.splitlines()[start_line - 1 : end_line])
         try:

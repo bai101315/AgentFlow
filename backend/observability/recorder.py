@@ -6,7 +6,7 @@ import time
 import uuid
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +21,8 @@ from .trajectory import append_jsonl
 logger = logging.getLogger(__name__)
 
 
-_CURRENT_TRACE: ContextVar["TraceContext | None"] = ContextVar("agentflow_current_trace", default=None)
-_RECORDER: "ObservabilityRecorder | None" = None
+_CURRENT_TRACE: ContextVar[TraceContext | None] = ContextVar("agentflow_current_trace", default=None)
+_RECORDER: ObservabilityRecorder | None = None
 
 
 @dataclass
@@ -50,7 +50,7 @@ def get_current_trace() -> TraceContext | None:
     return _CURRENT_TRACE.get()
 
 
-def get_observability_recorder() -> "ObservabilityRecorder":
+def get_observability_recorder() -> ObservabilityRecorder:
     global _RECORDER
     if _RECORDER is None:
         _RECORDER = ObservabilityRecorder()
@@ -668,4 +668,4 @@ def _empty_usage() -> dict[str, Any]:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
