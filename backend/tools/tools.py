@@ -80,6 +80,13 @@ def get_available_tools(
     builtin_tools = BUILTIN_TOOLS.copy()
     # print(f"builtin_tools: {builtin_tools}")
 
+    # Progressive skill disclosure: listing/viewing skills is a read path, so it
+    # is available whenever skills exist, independent of skill_evolution (which
+    # governs *writing* skills).
+    from tools.builtins.skill_tools import skills_list_tool, skill_view_tool
+
+    builtin_tools.extend([skills_list_tool, skill_view_tool])
+
     skill_evolution_config = getattr(config, "skill_evolution", None)
     if getattr(skill_evolution_config, "enabled", False):
         # Lazy import: 好处 1：避免循环依赖。2：减少启动时间

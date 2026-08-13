@@ -84,6 +84,7 @@ class ObservabilityMiddleware(AgentMiddleware[AgentState]):
             return handler(request)
 
         started_perf = time.perf_counter()
+        started_at = _utc_now_iso()
         status = "ok"
         error_type = None
         result_value: Any = ""
@@ -101,6 +102,7 @@ class ObservabilityMiddleware(AgentMiddleware[AgentState]):
             raise
         finally:
             elapsed_ms = int((time.perf_counter() - started_perf) * 1000)
+            ended_at = _utc_now_iso()
             get_observability_recorder().record_tool_call(
                 trace_id=context.trace_id,
                 tool_call_id=str(request.tool_call.get("id") or ""),
@@ -109,6 +111,8 @@ class ObservabilityMiddleware(AgentMiddleware[AgentState]):
                 result_value=result_value,
                 status=status,
                 error_type=error_type,
+                started_at=started_at,
+                ended_at=ended_at,
                 elapsed_ms=elapsed_ms,
             )
 
@@ -123,6 +127,7 @@ class ObservabilityMiddleware(AgentMiddleware[AgentState]):
             return await handler(request)
 
         started_perf = time.perf_counter()
+        started_at = _utc_now_iso()
         status = "ok"
         error_type = None
         result_value: Any = ""
@@ -140,6 +145,7 @@ class ObservabilityMiddleware(AgentMiddleware[AgentState]):
             raise
         finally:
             elapsed_ms = int((time.perf_counter() - started_perf) * 1000)
+            ended_at = _utc_now_iso()
             get_observability_recorder().record_tool_call(
                 trace_id=context.trace_id,
                 tool_call_id=str(request.tool_call.get("id") or ""),
@@ -148,6 +154,8 @@ class ObservabilityMiddleware(AgentMiddleware[AgentState]):
                 result_value=result_value,
                 status=status,
                 error_type=error_type,
+                started_at=started_at,
+                ended_at=ended_at,
                 elapsed_ms=elapsed_ms,
             )
 
@@ -187,11 +195,17 @@ def _extract_usage_dict(message: AIMessage) -> dict[str, Any]:
         usage.get("prompt_cache_miss_tokens", max(0, input_tokens - prompt_cache_hit_tokens)) or 0
     )
     denominator = prompt_cache_hit_tokens + prompt_cache_miss_tokens
+    # Billable input = everything that did not hit the cache.  Using
+    # ``input_tokens - prompt_cache_hit_tokens`` (instead of the model-reported
+    # miss count) keeps the semantics identical whether or not the provider
+    # returned cache fields, and is conservative when hit+miss < input (e.g.
+    # tool results or system prompt segments that are never cached).
+    billable_input_tokens = max(0, input_tokens - prompt_cache_hit_tokens)
     return {
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "total_tokens": total_tokens,
-        "billable_input_tokens": prompt_cache_miss_tokens if prompt_cache_miss_tokens > 0 else max(0, input_tokens - prompt_cache_hit_tokens),
+        "billable_input_tokens": billable_input_tokens,
         "cache_read_input_tokens": cache_read_tokens,
         "cache_creation_input_tokens": cache_creation_tokens,
         "prompt_cache_hit_tokens": prompt_cache_hit_tokens,

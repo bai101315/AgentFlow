@@ -63,6 +63,9 @@ skills/custom/*
 # sandbox_image_cache.tar
 study_md/
 web/
+!/backend/observability/web/
+!/backend/observability/web/**
+backend/observability/web/__pycache__/
 backend/Dockerfile.langgraph
 config.yaml.bak
 .playwright-mcp

@@ -118,12 +118,13 @@ def _resolve_skills_path(path: str) -> str:
 
 
 def _record_skill_use(requested_path: str) -> None:
-    """Record skill usage when the agent reads a file inside a skill directory.
+    """Record skill activity when the agent reads a file inside a skill directory.
 
-    The agent uses skills through progressive loading (reading the skill's
-    SKILL.md and support files), so a successful read of a path under
-    ``skills/<category>/<name>/`` is the "use" signal that keeps the skill's
-    ``last_activity_at`` fresh for curator lifecycle decisions.  Failures are
+    Reading a skill's own ``SKILL.md`` is inspection, so it counts as a ``view``
+    (the same signal ``skill_view`` records).  Reading anything else under the
+    skill directory — a reference, template or script — means the workflow is
+    actually being executed, so it counts as a ``use``.  Keeping the two apart
+    is what lets the curator distinguish a glance from real usage.  Failures are
     logged and swallowed so usage tracking never breaks a file read.
     """
     if not requested_path:
@@ -147,12 +148,14 @@ def _record_skill_use(requested_path: str) -> None:
         # Skip bookkeeping dirs (.archive, .history) and files (.usage.json).
         return
 
+    access = "view" if parts[-1] == "SKILL.md" else "use"
+
     try:
         from skill.usage import record_skill_access
 
-        record_skill_access(name, access="use")
+        record_skill_access(name, access=access)
     except Exception:
-        logger.debug("Failed to record skill usage for %s", name, exc_info=True)
+        logger.debug("Failed to record skill %s for %s", access, name, exc_info=True)
 
 
 def _is_acp_workspace_path(path: str) -> bool:

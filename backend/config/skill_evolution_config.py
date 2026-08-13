@@ -16,3 +16,7 @@ class SkillEvolutionConfig(BaseModel):
         default=True,
         description="Whether the agent may create new custom skills without confirmation when the reusable pattern is clear.",
     )
+    require_background_provenance: bool = Field(
+        default=True,
+        description="Whether background writes must carry an explicit background origin. When True, a background write with a foreground origin is rejected.",
+    )

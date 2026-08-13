@@ -142,6 +142,7 @@ skill_evolution:
   enabled: true
   auto_create: false
   moderation_model_name: null
+  require_background_provenance: true
 
 background_review:
   enabled: false
@@ -150,6 +151,8 @@ background_review:
   review_model_name: null
   notifications: "off"
   max_actions_per_review: 3
+  timeout_seconds: 120
+  max_concurrent_reviews: 1
 
 session_search:
   enabled: true
@@ -161,10 +164,10 @@ session_search:
 
 curator:
   enabled: false
-  interval_hours: 0
-  min_idle_hours: 0
-  stale_after_days: 1
-  archive_after_days: 1
+  interval_hours: 168
+  min_idle_hours: 2
+  stale_after_days: 30
+  archive_after_days: 90
   consolidate: false
   model_name: null
 

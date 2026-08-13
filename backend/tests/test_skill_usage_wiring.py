@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 
-def test_record_skill_use_records_custom_skill(monkeypatch):
+def test_record_skill_use_splits_view_and_use(monkeypatch):
+    """Reading SKILL.md is a view; reading a support file is a real use."""
     import sandbox.tools as sandbox_tools
 
     monkeypatch.setattr(sandbox_tools, "_get_skills_container_path", lambda: "/mnt/skills")
@@ -18,9 +19,9 @@ def test_record_skill_use_records_custom_skill(monkeypatch):
     sandbox_tools._record_skill_use("/mnt/skills/public/bootstrap/SKILL.md")
 
     assert recorded == [
+        ("my-skill", "view"),
         ("my-skill", "use"),
-        ("my-skill", "use"),
-        ("bootstrap", "use"),
+        ("bootstrap", "view"),
     ]
 
 
@@ -46,4 +47,4 @@ def test_record_skill_use_skips_bookkeeping_and_foreign_paths(monkeypatch):
     # Host-path form is recognized too.
     sandbox_tools._record_skill_use("/tmp/skills/custom/my-skill/SKILL.md")
 
-    assert recorded == [("my-skill", "use")]
+    assert recorded == [("my-skill", "view")]

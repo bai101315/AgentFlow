@@ -1,3 +1,4 @@
+# ruff: noqa: E501  # prompt lines are intentionally long
 import asyncio
 import logging
 from math import e
@@ -332,21 +333,31 @@ def _build_skill_evolution_section(skill_evolution_enabled: bool, *, auto_create
 Use `skill_manage` as the only write path for agent-managed skill changes. It keeps writes under `skills/custom`, validates skill markdown, scans content for safety, records history, and refreshes the skills prompt cache.
 
 First-class signals to preserve:
-- The user corrects your style, tone, formatting, verbosity, or response shape, especially "stop doing X", "too verbose", "don't format like this", "just give me the answer", or equivalent feedback.
+- The user corrects your style, tone, formatting, verbosity, or response shape, especially "stop doing X", "too verbose", "don't format like this", "just give me the answer", or equivalent feedback. This is a FIRST-CLASS skill signal, not just a memory signal — embed the preference in the skill that governs the task.
 - The user corrects your workflow, method, step order, command choice, or debugging approach and the corrected approach works.
 - You discover a non-trivial reusable technical workflow, repair pattern, guardrail, or pitfall after meaningful tool use.
 - You used a skill and found that it is wrong, incomplete, stale, or missing an important step.
 
+Where learnings live — route each durable signal to exactly one place:
+- SKILL (your writes via `skill_manage`) — HOW to do a class of task: workflows, repair patterns, pitfalls, style/verbosity preferences, guardrails, setup fixes.
+- Memory (handled by the memory system, not by you) — WHO the user is and their current situation: persona, job, projects, tech stack, stated facts. A preference's fact side (user hates verbosity) lives in memory; its execution side (how to answer this user) lives in the SKILL.md body. When the user complained about HOW you handled a task, the lesson belongs in the skill.
+- Session history (automatic via session_search, never written by you) — raw conversation text.
+- Nothing — environment-specific failures, transient in-session errors, negative tool claims, one-off task narratives (see below).
+
+Target shape of the library: CLASS-LEVEL skills with a rich SKILL.md and `references/` for session-specific detail — not a long flat list of narrow one-session-one-skill entries. This shapes HOW you update, not WHETHER you update.
+
 Do not preserve:
 - One-off task details, transient summaries, market/news requests, or project-specific facts that are not reusable.
 - Environment-dependent failures such as missing binaries, unavailable commands, local install drift, or post-migration breakage.
-- Broad negative claims that a tool or feature is broken.
+- Broad negative claims that a tool or feature is broken. If a tool failed due to setup state, capture the FIX (install command, config step, env var) under an existing setup/troubleshooting skill instead.
 - A temporary error that was resolved in the same conversation, unless the durable lesson is the retry or recovery pattern.
 
 Action priority:
 1. Patch the current relevant custom skill when one exists.
 2. Add a support file under `references/`, `templates/`, `scripts/`, or `assets/` when the lesson is too detailed for the main skill.
 3. Create a new class-level umbrella skill only when no existing custom skill covers the reusable workflow.
+
+If you notice two existing skills that overlap, mention it in your reply so a future curator pass can consolidate them — do not merge them yourself.
 
 Prefer `patch` over `edit`; use `edit` only when a precise patch is not practical. Skill names must be class-level hyphen-case names, not issue IDs, PR numbers, error strings, codenames, or one-off task names.
 """ + create_policy + "\n"
@@ -377,10 +388,10 @@ def _get_cached_skills_prompt_section(
 You have access to skills that provide optimized workflows for specific tasks. Each skill contains best practices, frameworks, and references to additional resources.
 
 **Progressive Loading Pattern:**
-1. When a user query matches a skill's use case, immediately call `read_file` on the skill's main file using the path attribute provided in the skill tag below
+1. When a user query matches a skill's use case, immediately call `skill_view` with the skill's name to load its instructions (use `skills_list` if you need the index again)
 2. Read and understand the skill's workflow and instructions
-3. The skill file contains references to external resources under the same folder
-4. Load referenced resources only when needed during execution
+3. `skill_view` reports the skill's support files under the same folder
+4. Load referenced resources only when needed during execution, using `read_file` on the reported paths
 5. Follow the skill's instructions precisely
 
 **Skills are located at:** {container_base_path}

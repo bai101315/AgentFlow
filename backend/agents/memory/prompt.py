@@ -1,3 +1,4 @@
+# ruff: noqa: E501  # prompt lines are intentionally long
 """Prompt templates for memory update and injection."""
 
 import math
@@ -24,18 +25,19 @@ New Conversation to Process:
 </conversation>
 
 Instructions:
-1. Analyze the conversation for important information about the user
-2. Extract relevant facts, preferences, and context with specific details (numbers, names, technologies)
+1. Analyze the conversation for durable information about the user, environment, and project
+2. Extract stable facts, preferences, and context with specific details (numbers, names, technologies)
 3. Update the memory sections as needed following the detailed length guidelines below
 
-Before extracting facts, perform a structured reflection on the conversation:
-1. Error/Retry Detection: Did the agent encounter errors, require retries, or produce incorrect results?
-   If yes, record the root cause and correct approach as a high-confidence fact with category "correction".
-2. User Correction Detection: Did the user correct the agent's direction, understanding, or output?
-   If yes, record the correct interpretation or approach as a high-confidence fact with category "correction".
-   Include what went wrong in "sourceError" only when category is "correction" and the mistake is explicit in the conversation.
-3. Project Constraint Discovery: Were any project-specific constraints discovered during the conversation?
-   If yes, record them as facts with the most appropriate category and confidence.
+Before extracting facts, distinguish durable facts from procedural lessons:
+1. User facts: retain stable identity, preference, goal, or communication facts.
+2. Environment facts: retain stable project, toolchain, repository, or configuration facts.
+3. Corrections: retain only a durable preference or project fact explicitly established by the user.
+   Do not store the error, retry sequence, debugging steps, or corrected procedure itself.
+
+Do not store reusable task procedures, debugging sequences, command recipes, API workflows, or
+generalized recovery steps in Memory. Those belong in the Skill library and are handled by the
+background Skill reviewer. Memory is for who/what facts, stable preferences, and environment facts.
 
 {correction_hint}
 
@@ -115,8 +117,8 @@ Important Rules:
 - Follow length guidelines: workContext/personalContext are concise (1-3 sentences), topOfMind and history sections are detailed (paragraphs)
 - Include specific metrics, version numbers, and proper nouns in facts
 - Only add facts that are clearly stated (0.9+) or strongly implied (0.7+)
-- Use category "correction" for explicit agent mistakes or user corrections; assign confidence >= 0.95 when the correction is explicit
-- Include "sourceError" only for explicit correction facts when the prior mistake or wrong approach is clearly stated; omit it otherwise
+- Use category "correction" only for durable user preferences or project facts explicitly established by the user
+- Do not include procedural error details or recovery steps in Memory — those are HOW-to-do-a-task lessons and belong in the skill library, not in memory. Memory holds the fact side of a preference (who the user is); the execution side (how to handle their tasks) lives in the skill that governs the task.
 - Remove facts that are contradicted by new information
 - When updating topOfMind, integrate new focus areas while removing completed/abandoned ones
   Keep 3-5 concurrent focus themes that are still active and relevant

@@ -1,15 +1,16 @@
 """Skill frontmatter validation utilities.
 
 Pure-logic validation of SKILL.md frontmatter — no FastAPI or HTTP dependencies.
+
+Validation is intentionally loose beyond the required fields: extra frontmatter
+keys are allowed (mirroring Hermes), so agent-authored skills are not rejected
+for harmless metadata like ``tags``.
 """
 
 import re
 from pathlib import Path
 
 import yaml
-
-# Allowed properties in SKILL.md frontmatter
-ALLOWED_FRONTMATTER_PROPERTIES = {"name", "description", "license", "allowed-tools", "metadata", "compatibility", "version", "author"}
 
 
 def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]:
@@ -44,11 +45,6 @@ def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]
     except yaml.YAMLError as e:
         return False, f"Invalid YAML in frontmatter: {e}", None
 
-    # Check for unexpected properties
-    unexpected_keys = set(frontmatter.keys()) - ALLOWED_FRONTMATTER_PROPERTIES
-    if unexpected_keys:
-        return False, f"Unexpected key(s) in SKILL.md frontmatter: {', '.join(sorted(unexpected_keys))}", None
-
     # Check required fields
     if "name" not in frontmatter:
         return False, "Missing 'name' in frontmatter", None
@@ -63,11 +59,9 @@ def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]
     if not name:
         return False, "Name cannot be empty", None
 
-    # Check naming convention (hyphen-case: lowercase with hyphens)
-    if not re.match(r"^[a-z0-9-]+$", name):
-        return False, f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)", None
-    if name.startswith("-") or name.endswith("-") or "--" in name:
-        return False, f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens", None
+    # Check naming convention (lowercase letters, digits, dots, underscores, hyphens)
+    if not re.match(r"^[a-z0-9][a-z0-9._-]*$", name):
+        return False, f"Name '{name}' should start with a letter or digit and use lowercase letters, digits, dots, underscores, and hyphens only", None
     if len(name) > 64:
         return False, f"Name is too long ({len(name)} characters). Maximum is 64 characters.", None
 
@@ -77,8 +71,6 @@ def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]
         return False, f"Description must be a string, got {type(description).__name__}", None
     description = description.strip()
     if description:
-        if "<" in description or ">" in description:
-            return False, "Description cannot contain angle brackets (< or >)", None
         if len(description) > 1024:
             return False, f"Description is too long ({len(description)} characters). Maximum is 1024 characters.", None
 

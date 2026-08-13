@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://unpkg.com/htmx.org@2.0.3"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>DeerFlow 观测</title>
+<style>
+/* ── Theme Variables ── */
+:root,[data-theme=dark] {
+  --bg: #0b0d11;
+  --bg-panel: #111318;
+  --bg-surface: #181b22;
+  --bg-hover: #1f2230;
+  --bg-elevated: #222639;
+  --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #e8eaed;
+  --text-secondary: #b0b8c8;
+  --text-tertiary: #788098;
+  --text-muted: #5a6278;
+  --accent: #6a5fc1;
+  --accent-hover: #8b7fd8;
+  --accent-bg: rgba(106,95,193,0.12);
+  --green: #34d399;
+  --green-bg: rgba(52,211,153,0.12);
+  --red: #f87171;
+  --red-bg: rgba(248,113,113,0.12);
+  --yellow: #fbbf24;
+  --yellow-bg: rgba(251,191,36,0.12);
+  --orange: #fb923c;
+  --orange-bg: rgba(251,146,60,0.12);
+  --blue: #60a5fa;
+  --blue-bg: rgba(96,165,250,0.12);
+  --font: 'Inter','PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif;
+  --font-mono: 'JetBrains Mono',ui-monospace,monospace;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.04);
+  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06);
+}
+[data-theme=light] {
+  --bg: #f5f6f8;
+  --bg-panel: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-hover: #f0f1f4;
+  --bg-elevated: #ffffff;
+  --border: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.14);
+  --text: #1a1d23;
+  --text-secondary: #4a5060;
+  --text-tertiary: #7a8298;
+  --text-muted: #9aa0b0;
+  --accent: #6a5fc1;
+  --accent-hover: #5548b0;
+  --accent-bg: rgba(106,95,193,0.08);
+  --green: #16a34a;
+  --green-bg: rgba(22,163,74,0.08);
+  --red: #dc2626;
+  --red-bg: rgba(220,38,38,0.08);
+  --yellow: #ca8a04;
+  --yellow-bg: rgba(202,138,4,0.08);
+  --orange: #ea580c;
+  --orange-bg: rgba(234,88,12,0.08);
+  --blue: #2563eb;
+  --blue-bg: rgba(37,99,235,0.08);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.container{max-width:1360px;margin:0 auto;padding:20px}
+
+/* ── Header ── */
+.header{display:flex;align-items:center;gap:6px;padding:0 20px;height:52px;background:var(--bg-panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.header .brand{color:var(--accent);font-weight:600;font-size:15px;letter-spacing:-0.3px;margin-right:12px}
+.header .nav-link{color:var(--text-tertiary);text-decoration:none;padding:7px 13px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;transition:all .12s;border:none;background:none}
+.header .nav-link:hover{color:var(--text);background:var(--bg-hover)}
+.header .nav-link.active{color:var(--text);background:var(--bg-hover)}
+.header .spacer{flex:1}
+.theme-toggle{background:none;border:1px solid var(--border);color:var(--text-tertiary);cursor:pointer;padding:5px 10px;border-radius:var(--radius-sm);font-size:12px;transition:all .12s}
+.theme-toggle:hover{color:var(--text);border-color:var(--border-strong)}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:5px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ── Cards ── */
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow-card)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.card-header h2{font-size:14px;font-weight:600;color:var(--text)}
+.card-header .count{color:var(--text-tertiary);font-size:12px}
+
+/* ── Tables ── */
+table{width:100%;border-collapse:collapse}
+th,td{padding:11px 12px;text-align:left;font-size:13px}
+th{color:var(--text-tertiary);font-weight:500;border-bottom:1px solid var(--border)}
+td{border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--bg-hover)}
+td a{color:var(--accent);text-decoration:none;font-weight:500}
+td a:hover{text-decoration:underline}
+
+/* ── Stats Grid ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;box-shadow:var(--shadow-card)}
+.stat-card .val{font-size:24px;font-weight:600;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.stat-card .lbl{font-size:12px;color:var(--text-tertiary);margin-top:4px;font-weight:400}
+.stats.primary{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stats.secondary{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:-4px}
+.stat-card.primary{padding:18px;text-align:left}
+.stat-card.primary .val{font-size:28px}
+.stat-card.primary .lbl{font-size:12px}
+.stat-card .trend{font-size:11px;color:var(--text-tertiary);margin-top:7px}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:500;font-family:var(--font-mono)}
+.badge-ok{background:var(--green-bg);color:var(--green)}
+.badge-fail{background:var(--red-bg);color:var(--red)}
+.badge-slow{background:var(--yellow-bg);color:var(--yellow)}
+.badge-pricey{background:var(--orange-bg);color:var(--orange)}
+.badge-nocache{background:var(--blue-bg);color:var(--blue)}
+.badge-recovered{background:var(--green-bg);color:var(--green)}
+.badge-neutral{background:var(--accent-bg);color:var(--accent)}
+
+/* ── Preview text ── */
+.preview{color:var(--text-tertiary);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px}
+.code{font-family:var(--font-mono);font-size:12px}
+
+/* ── Trace Timeline ── */
+.timeline{position:relative;padding-left:24px}
+.timeline::before{content:'';position:absolute;left:9px;top:8px;bottom:8px;width:2px;background:var(--border)}
+.t-node{position:relative;padding:8px 12px;margin-bottom:4px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:border-color .12s;background:rgba(255,255,255,0.01)}
+.t-node:hover{border-color:var(--border-strong)}
+.t-node::before{content:'';position:absolute;left:-17px;top:14px;width:8px;height:8px;border-radius:50%;border:2px solid var(--bg)}
+.t-node.llm::before{background:var(--accent)}
+.t-node.tool-ok::before{background:var(--green)}
+.t-node.tool-err::before{background:var(--red)}
+.t-node .hdr{display:flex;justify-content:space-between;align-items:center}
+.t-node .nm{font-weight:500;font-size:13px}
+.t-node .tm{color:var(--text-tertiary);font-size:11px;font-family:var(--font-mono)}
+.t-node .detail{display:grid;grid-template-rows:0fr;overflow:hidden;transition:grid-template-rows .2s}
+.t-node.open .detail{max-height:3000px}
+.t-node.open .detail{grid-template-rows:1fr}
+.t-node .detail > *{min-height:0}
+.t-node .detail-inner{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.t-node .detail-inner pre{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);background:rgba(0,0,0,.3);padding:8px;border-radius:4px;white-space:pre-wrap;word-break:break-word;max-height:250px;overflow-y:auto}
+.t-node .detail-inner .lbl{color:var(--text-tertiary);font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.expand-icon{color:var(--text-tertiary);font-size:9px;transition:transform .15s}
+.t-node.open .expand-icon{transform:rotate(90deg)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;text-decoration:none;cursor:pointer;border:1px solid var(--border);background:rgba(255,255,255,0.02);color:var(--text-secondary);transition:all .12s}
+.btn:hover{background:var(--bg-hover);color:var(--text);border-color:var(--border-strong)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn-sm{padding:3px 8px;font-size:11px}
+
+/* ── Misc ── */
+.flex{display:flex;gap:8px;align-items:center}
+.flex-wrap{flex-wrap:wrap}
+.gap-4{gap:4px}
+.mb-8{margin-bottom:8px}
+.mt-8{margin-top:8px}
+.text-muted{color:var(--text-tertiary)}
+.text-secondary{color:var(--text-secondary)}
+.chart-box{height:220px;margin:12px 0}
+.section-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px}
+
+/* ── Tab bar ── */
+.tab-bar{display:flex;gap:4px;margin-bottom:16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:4px;box-shadow:var(--shadow-card)}
+.tab-btn{padding:7px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--text-tertiary);transition:all .12s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{background:var(--accent);color:#fff}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* ── Content card (for trace detail) ── */
+.content-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow-card)}
+.content-card pre{font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;line-height:1.6}
+.content-card .label{color:var(--text-tertiary);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+
+/* ── Loading ── */
+.loading{text-align:center;padding:40px;color:var(--text-tertiary)}
+.empty-state{padding:44px 20px;text-align:center;color:var(--text-tertiary)}
+.empty-state .empty-mark{font-size:24px;color:var(--accent);margin-bottom:8px}
+.breadcrumb{display:flex;gap:7px;align-items:center;margin-bottom:14px;color:var(--text-tertiary);font-size:12px}
+.breadcrumb button{border:0;background:none;color:var(--accent);cursor:pointer;font:inherit}
+.list-row{display:grid;grid-template-columns:130px minmax(80px,1fr) 80px 74px minmax(180px,2fr);gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--border);transition:background .12s}
+.list-row:hover{background:var(--bg-hover)}
+.list-row:last-child{border-bottom:0}
+.list-row .primary{color:var(--text);font-weight:500}
+.list-row .secondary{color:var(--text-tertiary);font-size:12px}
+.list-row .preview{max-width:none}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.toolbar input{width:260px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-panel);color:var(--text);font:inherit;outline:none}
+.toolbar input:focus{border-color:var(--accent)}
+
+@media(max-width:768px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stats.primary,.stats.secondary{grid-template-columns:repeat(2,1fr)}
+  .list-row{grid-template-columns:1fr 80px 70px;gap:6px}
+  .list-row .hide-mobile{display:none}
+  .container{padding:12px}
+  .header{padding:0 12px}
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="brand">&#9670; 观测</span>
+  <button class="nav-link active" data-tab="overview" onclick="switchTab('overview')">概览</button>
+  <button class="nav-link" data-tab="threads" onclick="switchTab('threads')">会话</button>
+  <button class="nav-link" data-tab="stats" onclick="switchTab('stats')">统计</button>
+  <button class="nav-link" data-tab="self-improvement" onclick="switchTab('self-improvement')">自我改进</button>
+  <span class="spacer"></span>
+  <span id="live-badge" style="display:none;font-size:11px;color:var(--green)"><span class="live-dot"></span>实时</span>
+  <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">暗色</button>
+</div>
+
+<div class="container">
+
+<!-- ═══ 概览 ═══ -->
+<div id="tab-overview" class="tab-pane active" hx-get="/api/overview" hx-trigger="load" hx-swap="innerHTML" hx-target="this">
+  <div class="loading">加载中...</div>
+</div>
+
+<!-- ═══ 会话 ═══ -->
+<div id="tab-threads" class="tab-pane" hx-get="/api/threads" hx-trigger="load" hx-swap="innerHTML" hx-target="this">
+  <div class="loading">加载中...</div>
+</div>
+
+<!-- ═══ 统计 ═══ -->
+<div id="tab-stats" class="tab-pane" hx-get="/api/stats" hx-trigger="load" hx-swap="innerHTML" hx-target="this">
+  <div class="loading">加载中...</div>
+</div>
+
+<div id="tab-self-improvement" class="tab-pane">
+  <div class="loading">加载中...</div>
+</div>
+
+<!-- ═══ 会话详情（动态加载） ═══ -->
+<div id="tab-thread-detail" class="tab-pane"></div>
+
+<!-- ═══ 追踪详情（动态加载） ═══ -->
+<div id="tab-trace-detail" class="tab-pane"></div>
+
+</div><!-- /container -->
+
+<script>
+// ── Tab switching ──
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+  var pane = document.getElementById('tab-' + name);
+  if (pane) {
+    pane.classList.add('active');
+    // If the pane has hx-get but hasn't loaded yet, trigger it
+    if (pane.getAttribute('hx-get') && !pane.hasAttribute('data-loaded')) {
+      pane.setAttribute('data-loaded', 'true');
+      htmx.process(pane);
+    }
+    if (name === 'self-improvement') loadSelfImprovement();
+  }
+  var btn = document.querySelector('[data-tab="' + name + '"]');
+  if (btn) btn.classList.add('active');
+  // Update URL hash
+  history.replaceState(null, '', '#' + name);
+}
+
+function loadSelfImprovement() {
+  var pane = document.getElementById('tab-self-improvement');
+  if (!pane) return;
+  pane.innerHTML = '<div class="loading">加载中...</div>';
+  var params = new URLSearchParams();
+  var type = document.getElementById('si-event-type');
+  var status = document.getElementById('si-status');
+  var thread = document.getElementById('si-thread');
+  var skill = document.getElementById('si-skill');
+  if (type && type.value) params.set('event_type', type.value);
+  if (status && status.value) params.set('status', status.value);
+  if (thread && thread.value.trim()) params.set('thread_id', thread.value.trim());
+  if (skill && skill.value.trim()) params.set('skill', skill.value.trim());
+  fetch('/api/self-improvement?' + params.toString()).then(function(r){ return r.json(); }).then(function(data){
+    pane.innerHTML = renderSelfImprovement(data);
+  }).catch(function(){ pane.innerHTML = '<div class="content-card">自我改进事件暂时不可用</div>'; });
+}
+
+function renderSelfImprovement(data) {
+  var m = data.metrics || {};
+  var h = '<div class="stats primary">';
+  h += '<div class="stat-card primary"><div class="val">'+m.review_completed+'</div><div class="lbl">Review 完成</div><div class="trend">失败 '+m.review_failed+' · 丢弃 '+m.review_dropped+'</div></div>';
+  h += '<div class="stat-card primary"><div class="val" style="color:var(--green)">'+m.skill_events+'</div><div class="lbl">Skill 事件</div><div class="trend">自动写入审计</div></div>';
+  h += '<div class="stat-card primary"><div class="val">'+m.memory_completed+'</div><div class="lbl">Memory 完成</div><div class="trend">拒绝 '+m.memory_rejected+'</div></div>';
+  h += '<div class="stat-card primary"><div class="val" style="color:var(--yellow)">'+m.memory_dropped+'</div><div class="lbl">Memory 丢弃</div><div class="trend">退出时 pending</div></div></div>';
+  h += '<div class="toolbar flex-wrap">';
+  h += '<select id="si-event-type" onchange="loadSelfImprovement()"><option value="">全部事件</option><option value="review_completed">review_completed</option><option value="review_failed">review_failed</option><option value="review_dropped">review_dropped</option><option value="skill_create">skill_create</option><option value="skill_patch">skill_patch</option><option value="memory_completed">memory_completed</option><option value="memory_rejected">memory_rejected</option><option value="memory_dropped">memory_dropped</option></select>';
+  h += '<select id="si-status" onchange="loadSelfImprovement()"><option value="">全部状态</option><option value="completed">completed</option><option value="failed">failed</option><option value="rejected">rejected</option><option value="dropped">dropped</option></select>';
+  h += '<input id="si-thread" placeholder="Thread ID" onkeydown="if(event.key===\'Enter\')loadSelfImprovement()">';
+  h += '<input id="si-skill" placeholder="Skill 名称" onkeydown="if(event.key===\'Enter\')loadSelfImprovement()">';
+  h += '</div>';
+  h += '<div class="card"><div class="card-header"><h2>后台事件</h2><span class="count">'+(data.total||0)+' 条</span></div>';
+  if (!data.events || !data.events.length) return h + '<div class="empty-state">暂无自我改进事件</div></div>';
+  h += '<table><thead><tr><th>时间</th><th>事件</th><th>状态</th><th>Skill</th><th>Thread</th><th>详情</th></tr></thead><tbody>';
+  data.events.forEach(function(e){
+    var cls = e.status === 'completed' ? 'badge-ok' : (e.status === 'failed' || e.status === 'rejected' ? 'badge-fail' : 'badge-neutral');
+    h += '<tr><td class="text-muted" title="'+e.created_at+'">'+e.created_at.slice(0,19)+'</td><td class="code">'+e.event_type+'</td><td><span class="badge '+cls+'">'+(e.status||'—')+'</span></td><td>'+(e.skill||'—')+'</td><td class="code">'+(e.thread_id||e.parent_thread_id||'—').slice(0,18)+'</td><td><button class="btn btn-sm" onclick="showSelfImprovementEvent(\''+e.event_id+'\')">查看</button></td></tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+function showSelfImprovementEvent(eventId) {
+  fetch('/api/self-improvement/events/' + encodeURIComponent(eventId)).then(function(r){return r.json();}).then(function(e){
+    if (e.error) return;
+    alert(JSON.stringify({event:e.event_type,status:e.status,thread_id:e.thread_id,skill:e.skill,action:e.action,metadata:e.metadata}, null, 2));
+  });
+}
+
+// ── Open thread detail ──
+function openThread(threadId) {
+  var pane = document.getElementById('tab-thread-detail');
+  pane.innerHTML = '<div class="loading">加载中...</div>';
+  pane.classList.add('active');
+  document.querySelectorAll('.tab-pane').forEach(p => { if (p.id !== 'tab-thread-detail') p.classList.remove('active'); });
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+  history.replaceState(null, '', '#thread/' + threadId);
+
+  fetch('/api/thread/' + encodeURIComponent(threadId))
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { pane.innerHTML = '<div class="content-card">会话未找到</div>'; return; }
+      pane.innerHTML = renderThread(data);
+    });
+}
+
+// ── Open trace detail ──
+function openTrace(traceId) {
+  var pane = document.getElementById('tab-trace-detail');
+  pane.innerHTML = '<div class="loading">加载中...</div>';
+  pane.classList.add('active');
+  document.querySelectorAll('.tab-pane').forEach(p => { if (p.id !== 'tab-trace-detail') p.classList.remove('active'); });
+  document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+  history.replaceState(null, '', '#trace/' + traceId);
+
+  fetch('/api/trace/' + encodeURIComponent(traceId))
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { pane.innerHTML = '<div class="content-card">追踪未找到</div>'; return; }
+      pane.innerHTML = renderTrace(data);
+    });
+}
+
+// ── Render overview (HTMX response handler) ──
+document.body.addEventListener('htmx:beforeSwap', function(evt) {
+  if (evt.detail.target && evt.detail.target.id === 'tab-overview' && evt.detail.xhr) {
+    try {
+      var data = JSON.parse(evt.detail.xhr.responseText);
+      evt.detail.shouldSwap = false;
+      evt.detail.target.innerHTML = renderOverview(data);
+    } catch(e) {}
+  }
+  if (evt.detail.target && evt.detail.target.id === 'tab-threads' && evt.detail.xhr) {
+    try {
+      var data = JSON.parse(evt.detail.xhr.responseText);
+      evt.detail.shouldSwap = false;
+      evt.detail.target.innerHTML = renderThreads(data);
+    } catch(e) {}
+  }
+  if (evt.detail.target && evt.detail.target.id === 'tab-stats' && evt.detail.xhr) {
+    try {
+      var data = JSON.parse(evt.detail.xhr.responseText);
+      evt.detail.shouldSwap = false;
+      evt.detail.target.innerHTML = renderStats(data);
+      setTimeout(initStatCharts, 50);
+    } catch(e) {}
+  }
+});
+
+// ── Theme toggle ──
+function toggleTheme() {
+  var html = document.documentElement;
+  var current = html.getAttribute('data-theme');
+  var next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  document.getElementById('theme-btn').textContent = next === 'dark' ? '暗色' : '亮色';
+  localStorage.setItem('theme', next);
+  // Re-render charts if they exist
+  if (window._tokenChart) { window._tokenChart.destroy(); window._tokenChart = null; }
+  if (window._dailyChart) { window._dailyChart.destroy(); window._dailyChart = null; }
+  if (window._cacheChart) { window._cacheChart.destroy(); window._cacheChart = null; }
+  initOverviewChart();
+  initStatCharts();
+}
+// Restore saved theme
+(function() {
+  var saved = localStorage.getItem('theme');
+  if (saved) { document.documentElement.setAttribute('data-theme', saved); document.getElementById('theme-btn').textContent = saved === 'dark' ? '暗色' : '亮色'; }
+})();
+
+// ── Renderers ──
+
+function renderOverview(data) {
+  var h = '';
+  h += '<div class="stats primary">';
+  h += '<div class="stat-card primary"><div class="val">'+data.total_traces+'</div><div class="lbl">总追踪</div><div class="trend">全部时间</div></div>';
+  h += '<div class="stat-card primary"><div class="val" style="color:var(--red)">'+data.failed_traces+'</div><div class="lbl">失败追踪</div><div class="trend">需优先排查</div></div>';
+  h += '<div class="stat-card primary"><div class="val">'+data.total_tokens+'</div><div class="lbl">总 Token</div><div class="trend">输入 + 输出</div></div>';
+  h += '<div class="stat-card primary"><div class="val">'+data.avg_elapsed_ms+'</div><div class="lbl">平均耗时</div><div class="trend">每次追踪</div></div>';
+  h += '</div>';
+  h += '<div class="stats secondary">';
+  h += '<div class="stat-card"><div class="val" style="color:var(--green)">'+data.completed_traces+'</div><div class="lbl">已完成</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.avg_cache_hit_rate+'</div><div class="lbl">缓存命中率</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.total_billable+'</div><div class="lbl">计费输入 Token</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.thread_count+'</div><div class="lbl">会话数</div></div>';
+  h += '</div>';
+
+  // Recent traces
+  h += '<div class="card"><div class="card-header"><h2>最近追踪</h2><span class="count">最近 20 条</span></div>';
+  h += '<div id="recent-traces-container" hx-get="/api/recent" hx-trigger="load, every:5s" hx-swap="innerHTML" hx-target="this"><div class="loading">加载中...</div></div></div>';
+
+  // Chart
+  h += '<div class="card"><div class="card-header"><h2>每日 Token 用量</h2></div><div class="chart-box"><canvas id="tokenChart"></canvas></div></div>';
+
+  window._overviewChartData = data;
+  setTimeout(initOverviewChart, 50);
+  setTimeout(function() {
+    var recent = document.getElementById('recent-traces-container');
+    if (recent) {
+      htmx.process(recent);
+      htmx.trigger(recent, 'load');
+    }
+  }, 0);
+  return h;
+}
+
+function initOverviewChart() {
+  var data = window._overviewChartData;
+  var canvas = document.getElementById('tokenChart');
+  if (!data || !canvas || window._tokenChart) return;
+  var styles = getComputedStyle(document.documentElement);
+  var grid = styles.getPropertyValue('--border').trim();
+  var muted = styles.getPropertyValue('--text-tertiary').trim();
+  var accent = styles.getPropertyValue('--accent').trim();
+  var green = styles.getPropertyValue('--green').trim();
+  window._tokenChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: data.chart_dates, datasets: [
+      {label: '输入', data: data.chart_input, borderColor: accent, fill: false, tension: .3, pointRadius: 3},
+      {label: '输出', data: data.chart_output, borderColor: green, fill: false, tension: .3, pointRadius: 3}
+    ]},
+    options: {responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:muted,font:{size:11}}}, tooltip:{callbacks:{label:function(ctx){return ' '+ctx.dataset.label+': '+Number(ctx.raw).toLocaleString('zh-CN')+' Token';}}}},
+      scales:{x:{ticks:{color:muted,maxTicksLimit:8},grid:{color:grid}},y:{ticks:{color:muted,callback:function(v){return Number(v).toLocaleString('zh-CN');}},grid:{color:grid}}}
+    }
+  });
+}
+
+// Render recent traces table
+document.body.addEventListener('htmx:beforeSwap', function(evt) {
+  if (evt.detail.target && evt.detail.target.id === 'recent-traces-container' && evt.detail.xhr) {
+    try {
+      var data = JSON.parse(evt.detail.xhr.responseText);
+      evt.detail.shouldSwap = false;
+      evt.detail.target.innerHTML = renderRecentTable(data.traces);
+    } catch(e) {}
+  }
+});
+
+function renderRecentTable(traces) {
+  if (!traces || traces.length === 0) return '<div class="empty-state"><div class="empty-mark">○</div><div>暂无追踪记录</div><div style="font-size:12px;margin-top:4px">运行一次 Agent 后，这里会显示完整轨迹</div></div>';
+  var h = '<table><thead><tr><th>ID</th><th>时间</th><th>耗时</th><th>状态</th><th>输入</th></tr></thead><tbody>';
+  for (var r of traces) {
+    var tag = '正常';
+    var cls = 'badge-ok';
+    if (!r.completed) { tag = '失败'; cls = 'badge-fail'; }
+    else if (r.diagnostic_reasons.includes('slow_trace')) { tag = '慢'; cls = 'badge-slow'; }
+    else if (r.diagnostic_reasons.includes('high_billable_input_tokens')) { tag = '高成本'; cls = 'badge-pricey'; }
+    else if (r.diagnostic_reasons.includes('low_cache_hit_rate')) { tag = '低缓存'; cls = 'badge-nocache'; }
+    h += '<tr><td><a href="javascript:void(0)" onclick="openTrace(\''+r.trace_id+'\')">'+r.trace_id.slice(0,8)+'</a></td>';
+    h += '<td class="text-muted" title="'+r.started_at_absolute+'">'+r.started_at+'</td>';
+    h += '<td class="code">'+r.elapsed_ms+'</td>';
+    h += '<td><span class="badge '+cls+'">'+tag+'</span></td>';
+    h += '<td class="preview">'+(r.user_input ? r.user_input.slice(0,80) : '—')+'</td></tr>';
+  }
+  h += '</tbody></table>';
+  return h;
+}
+
+function renderThreads(data) {
+  var threads = data.threads;
+  if (!threads || threads.length === 0) return '<div class="card empty-state"><div class="empty-mark">○</div><div>暂无会话记录</div></div>';
+  var h = '<div class="toolbar"><input id="thread-filter" placeholder="搜索会话 ID 或 Agent" oninput="filterThreads(this.value)"><span class="text-muted">'+threads.length+' 个会话</span></div>';
+  h += '<div class="card"><div class="card-header"><h2>会话列表</h2><span class="count">按最近更新时间排序</span></div>';
+  h += '<div class="list-row" style="color:var(--text-tertiary);font-size:11px"><span>会话</span><span>Agent</span><span>追踪</span><span>失败</span><span class="hide-mobile">最近更新时间</span></div><div id="thread-list">';
+  for (var t of threads) {
+    h += '<div class="list-row thread-row" data-search="'+(t.thread_id+' '+(t.agent||'')).toLowerCase()+'">';
+    h += '<span><a class="primary" href="javascript:void(0)" onclick="openThread(\''+t.thread_id+'\')">'+t.thread_id.slice(0,24)+(t.thread_id.length>24?'…':'')+'</a><br><span class="secondary">'+t.total_tokens+' Token · '+t.cache_hit_rate+' 命中</span></span>';
+    h += '<span class="secondary">'+(t.agent||'—')+'</span><span>'+t.trace_count+'</span>';
+    h += '<span>'+(t.failed_tool_call_count>0?'<span class="badge badge-fail">'+t.failed_tool_call_count+'</span>':'<span class="text-muted">0</span>')+'</span>';
+    h += '<span class="secondary hide-mobile" title="'+t.updated_at_absolute+'">'+t.updated_at+'</span></div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function filterThreads(query) {
+  var q = query.toLowerCase().trim();
+  document.querySelectorAll('.thread-row').forEach(function(row) {
+    row.style.display = !q || row.dataset.search.includes(q) ? 'grid' : 'none';
+  });
+}
+
+function renderStats(data) {
+  var h = '';
+  h += '<div class="stats primary">';
+  h += '<div class="stat-card primary"><div class="val">'+data.total_traces+'</div><div class="lbl">总追踪</div></div>';
+  h += '<div class="stat-card primary"><div class="val" style="color:var(--red)">'+data.failed_traces+'</div><div class="lbl">失败追踪</div></div>';
+  h += '<div class="stat-card primary"><div class="val">'+data.total_tokens+'</div><div class="lbl">总 Token</div></div>';
+  h += '<div class="stat-card primary"><div class="val">'+data.avg_elapsed_ms+'</div><div class="lbl">平均耗时</div></div>';
+  h += '</div><div class="stats secondary">';
+  h += '<div class="stat-card"><div class="val">'+data.avg_cache_hit_rate+'</div><div class="lbl">缓存命中率</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.total_billable+'</div><div class="lbl">计费输入 Token</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.avg_input_tokens+'</div><div class="lbl">平均输入 Token</div></div>';
+  h += '<div class="stat-card"><div class="val"><span style="color:var(--yellow)">'+data.slow_count+'</span> / <span style="color:var(--orange)">'+data.pricey_count+'</span> / <span style="color:var(--blue)">'+data.nocache_count+'</span></div><div class="lbl">慢 / 高成本 / 低缓存</div></div>';
+  h += '</div>';
+  h += '<div class="card"><div class="card-header"><h2>每日 Token 趋势</h2></div><div class="chart-box"><canvas id="dailyChart"></canvas></div></div>';
+  h += '<div class="card"><div class="card-header"><h2>缓存命中率趋势</h2></div><div class="chart-box"><canvas id="cacheChart"></canvas></div></div>';
+  // Store chart data globally
+  window._chartData = data;
+  return h;
+}
+
+function initStatCharts() {
+  var data = window._chartData;
+  if (!data) return;
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var styles = getComputedStyle(document.documentElement);
+  var gridColor = styles.getPropertyValue('--border').trim();
+  var tickColor = styles.getPropertyValue('--text-tertiary').trim();
+  var accent = styles.getPropertyValue('--accent').trim();
+  var green = styles.getPropertyValue('--green').trim();
+  var yellow = styles.getPropertyValue('--yellow').trim();
+
+  // Daily chart
+  var dc = document.getElementById('dailyChart');
+  if (dc && !window._dailyChart) {
+    window._dailyChart = new Chart(dc, {
+      type: 'line',
+      data: {
+        labels: data.chart_dates,
+        datasets: [
+          { label: '输入', data: data.chart_input, borderColor: accent, backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 3 },
+          { label: '输出', data: data.chart_output, borderColor: green, backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 3 },
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: tickColor, font: { size: 11 } } } },
+        scales: { x: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } },
+                  y: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } } }
+      }
+    });
+  }
+  // Cache chart
+  var cc = document.getElementById('cacheChart');
+  if (cc && !window._cacheChart) {
+    window._cacheChart = new Chart(cc, {
+      type: 'line',
+      data: {
+        labels: data.chart_dates,
+        datasets: [
+          { label: '缓存命中率', data: data.chart_cache, borderColor: yellow, fill: false, tension: 0.3, pointRadius: 3 },
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: tickColor, font: { size: 11 } } } },
+        scales: { x: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } },
+                  y: { min: 0, max: 100, ticks: { color: tickColor, font: { size: 10 }, callback: function(v) { return v+'%'; } }, grid: { color: gridColor } } }
+      }
+    });
+  }
+}
+
+// ── Render thread detail ──
+function renderThread(data) {
+  var h = '';
+  h += '<div class="flex mb-8"><button class="btn btn-sm" onclick="switchTab(\'threads\')">&larr; 返回会话列表</button></div>';
+  h += '<div class="content-card"><div class="card-header"><h2>会话: '+data.thread_id+'</h2><span class="flex gap-4"><span class="text-muted">'+(data.agent||'—')+'</span><span class="code text-muted">'+(data.model||'—')+'</span></span></div>';
+  h += '<div class="stats">';
+  h += '<div class="stat-card"><div class="val">'+data.trace_count+'</div><div class="lbl">追踪次数</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.turn_count+'</div><div class="lbl">轮次</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.total_tokens+'</div><div class="lbl">总 Token</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.cache_hit_rate+'</div><div class="lbl">缓存命中率</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.tool_call_count+'</div><div class="lbl">工具调用</div></div>';
+  h += '<div class="stat-card"><div class="val" '+(data.failed_tool_call_count>0?'style="color:var(--red)"':'')+'>'+data.failed_tool_call_count+'</div><div class="lbl">失败调用</div></div>';
+  h += '</div>';
+
+  if (data.top_failed_tools && Object.keys(data.top_failed_tools).length > 0) {
+    h += '<div class="flex flex-wrap mb-8"><span class="text-muted" style="font-size:12px">常见失败工具:</span>';
+    for (var tool in data.top_failed_tools) {
+      h += '<span class="badge badge-fail">'+tool+': '+data.top_failed_tools[tool]+' 次</span>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+
+  h += '<div class="content-card"><div class="card-header"><h2>追踪记录</h2><span class="count">'+data.traces.length+' 条</span></div>';
+  for (var tr of data.traces) {
+    h += '<div class="content-card" style="margin-bottom:8px;padding:12px">';
+    h += '<div class="flex mb-8" style="justify-content:space-between">';
+    h += '<div class="flex gap-4"><a href="javascript:void(0)" onclick="openTrace(\''+tr.trace_id+'\')"><strong class="code" style="color:var(--accent)">'+tr.trace_id.slice(0,8)+'</strong></a>';
+    h += '<span class="text-muted" style="font-size:11px">'+tr.started_at+'</span>';
+    h += '<span class="code text-muted">'+tr.elapsed_ms+'</span></div>';
+    h += '<div class="flex gap-4">';
+    if (!tr.completed) h += '<span class="badge badge-fail">失败</span>';
+    if (tr.failure_reason) h += '<span class="badge badge-fail">'+tr.failure_reason.slice(0,30)+'</span>';
+    if (tr.had_any_failure) h += '<span class="badge badge-fail">异常</span>';
+    if (tr.recovered_after_failure) h += '<span class="badge badge-recovered">已恢复</span>';
+    h += '</div></div>';
+    if (tr.user_input) h += '<div class="text-muted" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">用户: '+tr.user_input.slice(0,120)+'</div>';
+    if (tr.assistant_output) h += '<div class="text-muted" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px">助手: '+tr.assistant_output.slice(0,120)+'</div>';
+    if (tr.tool_names && tr.tool_names.length > 0) {
+      h += '<div class="flex flex-wrap mt-8 gap-4">';
+      for (var tn of tr.tool_names) h += '<span class="badge badge-neutral">'+tn+'</span>';
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ── Render trace detail ──
+function renderTrace(data) {
+  var h = '';
+  h += '<div class="breadcrumb"><button onclick="switchTab(\'overview\')">概览</button><span>/</span><button onclick="openThread(\''+data.thread_id+'\')">会话</button><span>/</span><span class="code">'+data.trace_id.slice(0,8)+'</span></div>';
+
+  h += '<div class="content-card"><div class="card-header"><h2>追踪详情</h2>';
+  h += '<span class="flex gap-4"><span class="text-muted code">'+data.started_at+'</span>';
+  h += '<span class="badge '+(data.completed?'badge-ok':'badge-fail')+'">'+(data.completed?'完成':'失败')+'</span></span></div>';
+
+  h += '<div class="stats">';
+  h += '<div class="stat-card"><div class="val">'+data.elapsed_ms+'</div><div class="lbl">耗时</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.input_tokens+'</div><div class="lbl">输入 Token</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.output_tokens+'</div><div class="lbl">输出 Token</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.billable_input_tokens+'</div><div class="lbl">计费输入</div></div>';
+  h += '<div class="stat-card"><div class="val">'+data.cache_hit_rate+'</div><div class="lbl">缓存命中率</div></div>';
+  h += '<div class="stat-card"><div class="val" style="font-size:14px">'+(data.model_name||'—')+'</div><div class="lbl">模型</div></div>';
+  h += '</div>';
+  if (data.failure_reason) h += '<div class="mb-8"><span class="badge badge-fail">失败原因: '+data.failure_reason+'</span></div>';
+  h += '</div>';
+
+  // User input
+  h += '<div class="content-card"><div class="card-header"><h2>用户输入</h2></div><pre>'+(data.user_input||'（无）')+'</pre></div>';
+  // Assistant output
+  h += '<div class="content-card"><div class="card-header"><h2>助手输出</h2></div><pre>'+(data.assistant_output||'（无）')+'</pre></div>';
+
+  // Timeline
+  var totalNodes = (data.model_calls||[]).length + (data.tool_calls||[]).length;
+  if (totalNodes > 0) {
+    h += '<div class="content-card"><div class="card-header"><h2>轨迹路线图</h2>';
+    h += '<span class="count">'+(data.model_calls||[]).length+' 次 LLM · '+(data.tool_calls||[]).length+' 次工具</span></div>';
+    h += '<div class="timeline">';
+    for (var node of (data.nodes||[])) {
+      var mc = node.kind === 'llm' ? node : null;
+      var tc = node.kind === 'tool' ? node : null;
+      if (mc) {
+      h += '<div class="t-node llm" onclick="this.classList.toggle(\'open\')">';
+      h += '<div class="hdr"><span class="nm">LLM: '+(mc.model_name||'?')+'</span><span class="flex"><span class="tm">'+mc.elapsed_ms+'</span><span class="expand-icon">&#9654;</span></span></div>';
+      h += '<div class="detail"><div class="detail-inner"><div class="lbl">Token 使用</div>';
+      h += '<pre>输入: '+mc.input_tokens+'  输出: '+mc.output_tokens+'  缓存命中率: '+mc.cache_hit_rate+'</pre></div></div></div>';
+      } else if (tc) {
+      var cls = tc.status === 'ok' ? 'tool-ok' : 'tool-err';
+      h += '<div class="t-node '+cls+'" onclick="this.classList.toggle(\'open\')">';
+      h += '<div class="hdr"><span class="nm">'+(tc.tool_name||'?')+'</span><span class="flex">';
+      if (tc.status !== 'ok') h += '<span class="badge badge-fail">错误</span>';
+      h += '<span class="tm">'+tc.elapsed_ms+'</span><span class="expand-icon">&#9654;</span></span></div>';
+      h += '<div class="detail"><div class="detail-inner">';
+      if (tc.args_preview) h += '<div class="lbl">输入参数</div><pre>'+tc.args_preview+'</pre>';
+      if (tc.result_preview) h += '<div class="lbl" style="margin-top:6px">输出结果</div><pre'+(tc.status!=='ok'?' style="color:var(--red)"':'')+'>'+tc.result_preview+'</pre>';
+      h += '</div></div></div>';
+      }
+    }
+    h += '</div></div>';
+  }
+
+  // Cache events
+  if (data.cache_events && data.cache_events.length > 0) {
+    h += '<div class="content-card"><div class="card-header"><h2>缓存事件</h2></div>';
+    h += '<table><thead><tr><th>缓存</th><th>命中 Token</th><th>未命中 Token</th><th>时间</th></tr></thead><tbody>';
+    for (var ce of data.cache_events) {
+      h += '<tr><td>'+ce.cache_name+'</td><td class="code">'+ce.hit_tokens+'</td><td class="code">'+ce.miss_tokens+'</td><td class="text-muted">'+ce.created_at+'</td></tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  return h;
+}
+
+// ── WebSocket live updates ──
+(function() {
+  var badge = document.getElementById('live-badge');
+  try {
+    var ws = new WebSocket('ws://' + location.host + '/ws');
+    ws.onopen = function() { if (badge) badge.style.display = 'inline'; };
+    ws.onmessage = function(e) {
+      var data = JSON.parse(e.data);
+      if (data.type === 'new_trace') {
+        // Refresh the overview tab's recent traces
+        var recent = document.getElementById('recent-traces-container');
+        if (recent) htmx.trigger(recent, 'load');
+        // Refresh overview stats
+        var ov = document.getElementById('tab-overview');
+        if (ov && ov.classList.contains('active')) htmx.trigger(ov, 'load');
+      }
+    };
+    ws.onclose = function() { if (badge) badge.style.display = 'none'; };
+  } catch(e) {}
+})();
+
+// ── Restore tab from URL hash ──
+(function() {
+  var hash = location.hash.slice(1) || 'overview';
+  if (hash.startsWith('thread/')) { openThread(hash.slice(7)); }
+  else if (hash.startsWith('trace/')) { openTrace(hash.slice(6)); }
+  else { switchTab(hash); }
+})();
+</script>
+</body>
+</html>

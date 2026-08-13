@@ -26,6 +26,51 @@ def _reset_app_config_after_test():
 
 
 @pytest.fixture
+def real_events():
+    """Opt out of the autouse event-log isolation.
+
+    Tests that request this fixture assert on real event persistence (via
+    ``skill.events.read_events``) and are responsible for pointing the paths
+    at an isolated directory themselves (e.g. through tmp_path).
+    """
+    return None
+
+
+@pytest.fixture(autouse=True)
+def _isolate_self_improvement_events(monkeypatch, request):
+    """Keep self-improvement events out of the real event log.
+
+    ``emit_event`` appends to ``{AGENTFLOW_HOME}/self_improvement/events.jsonl``
+    and the observability DB.  Tests that exercise drop paths (review_dropped,
+    memory_dropped) or real skill writes would otherwise pollute the user's
+    production event stream with ``thread-1``-style test events — exactly the
+    phantom "dropped" entries seen in the observability UI.  Swallow the events
+    in tests; none of the current tests assert on event persistence.
+    """
+    if "real_events" in request.fixturenames:
+        # The test isolates its own event paths and asserts on persistence.
+        yield None
+        return
+
+    import skill.events as events_module
+
+    emitted: list[dict] = []
+
+    def _noop_emit(event: str, **fields) -> None:
+        emitted.append({"event": event, **fields})
+
+    monkeypatch.setattr(events_module, "emit_event", _noop_emit)
+    # Module-level `from skill.events import emit_event` bindings are resolved
+    # at import time, so patch those namespaces too.
+    import agents.review_agent.runtime as review_runtime
+    import tools.skill_manage_tool as skill_manage_tool
+
+    monkeypatch.setattr(review_runtime, "emit_event", _noop_emit)
+    monkeypatch.setattr(skill_manage_tool, "emit_event", _noop_emit)
+    yield emitted
+
+
+@pytest.fixture
 def tmp_path():
     """Project-local temporary directory.
 

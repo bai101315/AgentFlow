@@ -166,8 +166,89 @@ class ObservabilityStore:
                     imported_at TEXT NOT NULL,
                     payload_json TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS background_events (
+                    event_id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    status TEXT,
+                    thread_id TEXT,
+                    parent_thread_id TEXT,
+                    review_thread_id TEXT,
+                    agent_name TEXT,
+                    skill TEXT,
+                    action TEXT,
+                    elapsed_ms INTEGER,
+                    model_name TEXT,
+                    metadata_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_background_events_created_at ON background_events(created_at);
+                CREATE INDEX IF NOT EXISTS idx_background_events_thread_id ON background_events(thread_id);
+                CREATE INDEX IF NOT EXISTS idx_background_events_event_type ON background_events(event_type);
                 """
             )
+
+    def insert_background_event(self, payload: dict[str, Any]) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO background_events (
+                    event_id, created_at, event_type, status, thread_id,
+                    parent_thread_id, review_thread_id, agent_name, skill,
+                    action, elapsed_ms, model_name, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["event_id"], payload["created_at"], payload["event_type"],
+                    payload.get("status"), payload.get("thread_id"),
+                    payload.get("parent_thread_id"), payload.get("review_thread_id"),
+                    payload.get("agent_name"), payload.get("skill"),
+                    payload.get("action"), payload.get("elapsed_ms"),
+                    payload.get("model_name"),
+                    json.dumps(payload.get("metadata", {}), ensure_ascii=False, sort_keys=True),
+                ),
+            )
+
+    def list_background_events(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        event_type: str | None = None,
+        status: str | None = None,
+        thread_id: str | None = None,
+        skill: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        for field, value in (("event_type", event_type), ("status", status), ("thread_id", thread_id), ("skill", skill)):
+            if value:
+                clauses.append(f"{field} = ?")
+                params.append(value)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._lock, self._connect() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM background_events {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (*params, max(1, min(limit, 200)), max(0, offset)),
+            ).fetchall()
+        return [self._background_event_row(row) for row in rows]
+
+    def get_background_event(self, event_id: str) -> dict[str, Any] | None:
+        with self._lock, self._connect() as conn:
+            row = conn.execute("SELECT * FROM background_events WHERE event_id = ?", (event_id,)).fetchone()
+        return self._background_event_row(row) if row else None
+
+    @staticmethod
+    def _background_event_row(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "event_id": row["event_id"], "created_at": row["created_at"],
+            "event_type": row["event_type"], "status": row["status"],
+            "thread_id": row["thread_id"], "parent_thread_id": row["parent_thread_id"],
+            "review_thread_id": row["review_thread_id"], "agent_name": row["agent_name"],
+            "skill": row["skill"], "action": row["action"], "elapsed_ms": row["elapsed_ms"],
+            "model_name": row["model_name"],
+            "metadata": json.loads(row["metadata_json"] or "{}"),
+        }
 
     def upsert_trace(self, payload: dict[str, Any]) -> None:
         with self._lock, self._connect() as conn:

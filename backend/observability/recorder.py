@@ -227,13 +227,17 @@ class ObservabilityRecorder:
             return
 
         span_id = str(uuid.uuid4())
-        preview = sanitize_preview(preview_text or "", max_chars=self._config.max_preview_chars)
+        if context.content_mode != "off":
+            preview = sanitize_preview(preview_text or "", max_chars=self._config.max_preview_chars)
+            payload_preview = preview
+        else:
+            payload_preview = {}
         payload = {
             "span_id": span_id,
             "trace_id": trace_id,
             "model_name": model_name,
             "usage": usage,
-            "preview": preview if context.content_mode != "off" else {},
+            "preview": payload_preview,
             "started_at": started_at,
             "ended_at": ended_at,
             "elapsed_ms": elapsed_ms,
@@ -273,16 +277,31 @@ class ObservabilityRecorder:
         result_value: Any,
         status: str,
         error_type: str | None,
+        started_at: str,
+        ended_at: str,
         elapsed_ms: int,
-        retry_count: int = 0,
     ) -> None:
         context = get_current_trace()
         if context is None or context.trace_id != trace_id:
             return
 
         span_id = str(uuid.uuid4())
-        args_preview = sanitize_preview(args_value, max_chars=self._config.max_preview_chars)
-        result_preview = sanitize_preview(result_value, max_chars=self._config.max_preview_chars)
+        capture_args = self._config.capture_tool_args and context.content_mode != "off"
+        capture_results = self._config.capture_tool_results and context.content_mode != "off"
+        if capture_args:
+            args_preview = sanitize_preview(args_value, max_chars=self._config.max_preview_chars)
+            args_preview_payload = args_preview["preview"]
+            args_hash = args_preview["hash"]
+        else:
+            args_preview_payload = None
+            args_hash = None
+        if capture_results:
+            result_preview = sanitize_preview(result_value, max_chars=self._config.max_preview_chars)
+            result_preview_payload = result_preview["preview"]
+            result_hash = result_preview["hash"]
+        else:
+            result_preview_payload = None
+            result_hash = None
         payload = {
             "span_id": span_id,
             "trace_id": trace_id,
@@ -291,11 +310,10 @@ class ObservabilityRecorder:
             "status": status,
             "error_type": error_type,
             "elapsed_ms": elapsed_ms,
-            "retry_count": retry_count,
-            "args_preview": args_preview["preview"] if self._config.capture_tool_args and context.content_mode != "off" else None,
-            "args_hash": args_preview["hash"] if self._config.capture_tool_args else None,
-            "result_preview": result_preview["preview"] if self._config.capture_tool_results and context.content_mode != "off" else None,
-            "result_hash": result_preview["hash"] if self._config.capture_tool_results else None,
+            "args_preview": args_preview_payload,
+            "args_hash": args_hash,
+            "result_preview": result_preview_payload,
+            "result_hash": result_hash,
         }
         self._store.insert_span(
             {
@@ -303,8 +321,8 @@ class ObservabilityRecorder:
                 "trace_id": trace_id,
                 "span_type": "tool_call",
                 "name": tool_name,
-                "started_at": _utc_now_iso(),
-                "ended_at": _utc_now_iso(),
+                "started_at": started_at,
+                "ended_at": ended_at,
                 "elapsed_ms": elapsed_ms,
                 "status": status,
                 "error_type": error_type,

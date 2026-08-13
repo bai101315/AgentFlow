@@ -145,6 +145,12 @@ class MemoryUpdateQueue:
         for context in contexts_to_process:
             try:
                 logger.info("Updating memory for thread %s", context.thread_id)
+                try:
+                    from skill.events import emit_event
+
+                    emit_event("memory_started", status="running", thread_id=context.thread_id, agent_name=context.agent_name)
+                except Exception:
+                    pass
 
                 success = updater.update_memory(
                     messages=context.messages,
@@ -204,6 +210,23 @@ class MemoryUpdateQueue:
 
             self._process_contexts(pending)
             return len(pending)
+
+    def discard_pending(self) -> int:
+        """Cancel debounce work that has not started processing."""
+        with self._lock:
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
+            discarded = len(self._queue)
+            self._queue.clear()
+        if discarded:
+            try:
+                from skill.events import emit_event
+
+                emit_event("memory_dropped", status="dropped", count=discarded)
+            except Exception:
+                pass
+        return discarded
 
 
 # Global singleton instance

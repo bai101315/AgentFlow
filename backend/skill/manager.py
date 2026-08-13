@@ -17,7 +17,7 @@ SKILL_FILE_NAME = "SKILL.md"
 HISTORY_FILE_NAME = "HISTORY.jsonl"
 HISTORY_DIR_NAME = ".history"
 ALLOWED_SUPPORT_SUBDIRS = {"references", "templates", "scripts", "assets"}
-_SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
 def get_skills_root_dir() -> Path:
@@ -37,7 +37,9 @@ def get_custom_skills_dir() -> Path:
 def validate_skill_name(name: str) -> str:
     normalized = name.strip()
     if not _SKILL_NAME_PATTERN.fullmatch(normalized):
-        raise ValueError("Skill name must be hyphen-case using lowercase letters, digits, and hyphens only.")
+        raise ValueError(
+            "Skill name must start with a letter or digit and contain only lowercase letters, digits, dots, underscores, and hyphens."
+        )
     if len(normalized) > 64:
         raise ValueError("Skill name must be 64 characters or fewer.")
     return normalized

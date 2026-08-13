@@ -4,8 +4,12 @@ from pydantic import BaseModel, Field
 
 
 def _default_repo_root() -> Path:
-    """Resolve the repo root without relying on the current working directory."""
-    return Path(__file__).resolve().parents[5]
+    """Resolve the repo root without relying on the current working directory.
+
+    This file lives at ``backend/config/skills_config.py``, so the repo root is
+    two levels up.  ``skill/loader.py`` already carries the same correction.
+    """
+    return Path(__file__).resolve().parents[2]
 
 
 class SkillsConfig(BaseModel):
@@ -18,6 +22,15 @@ class SkillsConfig(BaseModel):
     container_path: str = Field(
         default="/mnt/skills",
         description="Path where skills are mounted in the sandbox container",
+    )
+    guard_agent_created: bool = Field(
+        default=False,
+        description=(
+            "Whether to run an LLM security scan on agent-created skill writes. "
+            "Off by default: the agent can already execute the same code paths via "
+            "bash, so the scan adds friction without meaningful security. Enable "
+            "for belt-and-suspenders moderation."
+        ),
     )
 
     def get_skills_path(self) -> Path:

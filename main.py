@@ -149,7 +149,7 @@ def _save_last_agent(agent_name: str) -> None:
 
 
 def _flush_memory_queue() -> None:
-    """Flush pending memory updates on shutdown so memory.json is written.
+    """Discard pending memory updates on shutdown without calling a model.
 
     The memory debounce timer runs on a daemon thread: if the process exits
     before the timer fires, queued updates would be lost and no memory file
@@ -158,11 +158,27 @@ def _flush_memory_queue() -> None:
     try:
         from agents.memory.queue import get_memory_queue
 
-        processed = get_memory_queue().flush()
-        if processed:
-            print(f"Memory updates flushed: {processed} pending update(s) saved.")
+        discarded = get_memory_queue().discard_pending()
+        if discarded:
+            print(f"Memory updates discarded: {discarded} pending update(s).")
     except Exception as exc:
         print(f"Warning: failed to flush memory updates: {exc}")
+
+
+def _drain_background_reviews() -> None:
+    """Wait briefly for in-flight background reviews before exiting.
+
+    Review threads are daemons, so a review that is mid-write when the process
+    exits would leave the skill store without its history/usage records.  The
+    wait is bounded so a hung model provider cannot block shutdown.
+    """
+    try:
+        from agents.review_agent.runtime import get_review_scheduler
+
+        if not get_review_scheduler().wait_for_idle(timeout=15.0):
+            print("Warning: background review still running at exit; skipping wait.")
+    except Exception as exc:
+        print(f"Warning: failed to drain background reviews: {exc}")
 
 
 def _agent_threads_file() -> Path:
@@ -1032,6 +1048,7 @@ async def main(args: argparse.Namespace) -> None:
                 if user_input.lower() in ("q", "exit"):
                     _finalize_session("user_exit")
                     _flush_memory_queue()
+                    _drain_background_reviews()
                     print("Goodbye!")
                     break
 
@@ -1077,6 +1094,7 @@ async def main(args: argparse.Namespace) -> None:
             except KeyboardInterrupt:
                 _finalize_session("keyboard_interrupt")
                 _flush_memory_queue()
+                _drain_background_reviews()
                 print("Goodbye!")
                 break
             except Exception as exc:

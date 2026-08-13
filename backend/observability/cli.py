@@ -22,7 +22,22 @@ from pathlib import Path
 
 
 def _resolve_db() -> Path:
-    """Find observability.db under the project's data directory."""
+    """Find observability.db under the project's data directory.
+
+    The canonical location is ``{base_dir}/observability.db`` where base_dir
+    comes from ``config.paths.get_paths()`` (AGENTFLOW_HOME -> DEER_FLOW_HOME
+    -> repo-local ``.agentflow``) — the same source the recorder writes to.
+    Legacy hard-coded locations are kept as fallbacks.
+    """
+    try:
+        from config.paths import get_paths
+
+        canonical = get_paths().base_dir / "observability.db"
+        if canonical.exists():
+            return canonical
+    except Exception:
+        pass
+
     # Try common locations
     candidates = [
         Path.home() / ".agentflow" / "observability.db",
@@ -123,7 +138,7 @@ def cmd_stats(args: argparse.Namespace) -> None:
             ROUND(AVG(CAST(json_extract(usage_json, '$.output_tokens') AS INTEGER))) AS avg_output_tokens,
             SUM(CAST(json_extract(usage_json, '$.total_tokens') AS INTEGER)) AS total_tokens,
             SUM(CAST(json_extract(usage_json, '$.billable_input_tokens') AS INTEGER)) AS total_billable_input_tokens,
-            ROUND(AVG(CAST(json_extract(usage_json, '$.prompt_cache_hit_rate') AS REAL)) * 100, 1) AS avg_cache_hit_rate
+            ROUND(AVG(CAST(json_extract(usage_json, '$.prompt_cache_hit_rate') AS REAL)), 3) AS avg_cache_hit_rate
         FROM traces
     """
     ).fetchone()
@@ -139,7 +154,7 @@ def cmd_stats(args: argparse.Namespace) -> None:
         print(f"  Avg output tokens:{_fmt_tokens(row['avg_output_tokens'])}")
         print(f"  Total tokens:     {_fmt_tokens(row['total_tokens'])}")
         print(f"  Total billable:   {_fmt_tokens(row['total_billable_input_tokens'])}")
-        print(f"  Avg cache hit:    {row['avg_cache_hit_rate']}%" if row['avg_cache_hit_rate'] else "  Avg cache hit:    n/a")
+        print(f"  Avg cache hit:    {_fmt_rate(row['avg_cache_hit_rate'])}")
     else:
         print("  No traces recorded yet.")
 
@@ -409,16 +424,16 @@ def cmd_tail(args: argparse.Namespace) -> None:
                 diagnostics = summary.get("diagnostics", {})
                 reasons = diagnostics.get("reasons", [])
 
+                tags = []
                 if not r["completed"]:
-                    tag = "FAIL"
-                elif "low_cache_hit_rate" in reasons:
-                    tag = "NOCACHE"
-                elif "high_billable_input_tokens" in reasons:
-                    tag = "PRICEY"
-                elif "slow_trace" in reasons:
-                    tag = "SLOW"
-                else:
-                    tag = "OK"
+                    tags.append("FAIL")
+                if "low_cache_hit_rate" in reasons:
+                    tags.append("NOCACHE")
+                if "high_billable_input_tokens" in reasons:
+                    tags.append("PRICEY")
+                if "slow_trace" in reasons:
+                    tags.append("SLOW")
+                tag = " ".join(tags) if tags else "OK"
 
                 preview = (r["user_input_preview"] or "")[:60]
 

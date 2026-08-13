@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class BackgroundReviewConfig(BaseModel):
@@ -32,6 +32,17 @@ class BackgroundReviewConfig(BaseModel):
         le=10,
         description="Maximum skill actions a single background review may apply.",
     )
+    timeout_seconds: float = Field(
+        default=120,
+        ge=5,
+        description="Wall-clock budget for a single background review, including model calls and action application.",
+    )
+    max_concurrent_reviews: int = Field(
+        default=1,
+        ge=1,
+        le=4,
+        description="Maximum background reviews running at once across all threads.",
+    )
 
 
 class CuratorConfig(BaseModel):
@@ -43,8 +54,8 @@ class CuratorConfig(BaseModel):
     )
     interval_hours: float = Field(
         default=168,
-        ge=0,
-        description="Minimum hours between curator runs.",
+        ge=1,
+        description="Minimum hours between curator runs. Values below 1 are rejected so the scheduler can never be always-due.",
     )
     min_idle_hours: float = Field(
         default=2,
@@ -69,6 +80,12 @@ class CuratorConfig(BaseModel):
         default=None,
         description="Optional model name for curator consolidation.",
     )
+
+    @model_validator(mode="after")
+    def _validate_lifecycle_windows(self) -> "CuratorConfig":
+        if self.archive_after_days <= self.stale_after_days:
+            raise ValueError("curator.archive_after_days must be greater than curator.stale_after_days.")
+        return self
 
 
 class SessionSearchConfig(BaseModel):

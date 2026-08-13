@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import asyncio
 import shutil
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Any
 
 from config.self_improvement_config import CuratorConfig
 from skill.action_parsing import parse_actions_json
@@ -197,7 +198,7 @@ def _model_consolidation_actions(config: CuratorConfig, candidates: list[dict[st
 
 
 async def apply_consolidation_actions(actions: list[dict[str, Any]], *, max_actions: int = 8) -> list[str]:
-    from agents.middlewares.background_review_middleware import BACKGROUND_REVIEW_ORIGIN
+    from skill.usage import ORIGIN_CURATOR
     from tools.skill_manage_tool import _skill_manage_impl
 
     runtime = SimpleNamespace(context={}, config={"configurable": {}})
@@ -214,7 +215,8 @@ async def apply_consolidation_actions(actions: list[dict[str, Any]], *, max_acti
                     find=action.get("find"),
                     replace=action.get("replace"),
                     expected_count=action.get("expected_count"),
-                    origin=BACKGROUND_REVIEW_ORIGIN,
+                    origin=ORIGIN_CURATOR,
+                    execution_context="curator",
                 )
                 summaries.append(result)
             elif action_name == "create_skill":
@@ -223,7 +225,8 @@ async def apply_consolidation_actions(actions: list[dict[str, Any]], *, max_acti
                     action="create",
                     name=name,
                     content=action.get("content"),
-                    origin=BACKGROUND_REVIEW_ORIGIN,
+                    origin=ORIGIN_CURATOR,
+                    execution_context="curator",
                 )
                 summaries.append(result)
             elif action_name == "write_support_file":
@@ -233,7 +236,8 @@ async def apply_consolidation_actions(actions: list[dict[str, Any]], *, max_acti
                     name=name,
                     path=action.get("path"),
                     content=action.get("content"),
-                    origin=BACKGROUND_REVIEW_ORIGIN,
+                    origin=ORIGIN_CURATOR,
+                    execution_context="curator",
                 )
                 summaries.append(result)
             elif action_name == "archive_skill":

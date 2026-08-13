@@ -2,7 +2,6 @@
 
 import json
 import logging
-import math
 import re
 import uuid
 from typing import Any
@@ -20,6 +19,30 @@ from config.memory_config import get_memory_config
 from models.factory import create_chat_model
 
 logger = logging.getLogger(__name__)
+
+_SECRET_PATTERNS = (
+    ("private_key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----", re.IGNORECASE)),
+    ("bearer_token", re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{16,}", re.IGNORECASE)),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
+    ("token_assignment", re.compile(r"\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]\s*['\"]?[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE)),
+    ("provider_token", re.compile(r"\b(?:sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{12,}|github_pat_[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9_-]{12,})\b", re.IGNORECASE)),
+)
+
+
+def _secret_rule(text: str) -> str | None:
+    for rule, pattern in _SECRET_PATTERNS:
+        if pattern.search(text):
+            return rule
+    return None
+
+
+def _emit_memory_failure(thread_id: str | None, agent_name: str | None, reason: str) -> None:
+    try:
+        from skill.events import emit_event
+
+        emit_event("memory_failed", status="failed", thread_id=thread_id, agent_name=agent_name, reason=reason)
+    except Exception:
+        logger.debug("Failed to record memory failure event", exc_info=True)
 
 def _create_empty_memory() -> dict[str, Any]:
     """Backward-compatible wrapper around the storage-layer empty-memory factory."""
@@ -225,6 +248,7 @@ class MemoryUpdater:
             return False
 
         if not messages:
+            _emit_memory_failure(thread_id, agent_name, "empty_input")
             return False
         
         try:
@@ -235,6 +259,12 @@ class MemoryUpdater:
             conversation_text = format_conversation_for_update(messages)
 
             if not conversation_text.strip():
+                _emit_memory_failure(thread_id, agent_name, "empty_conversation")
+                return False
+            if rule := _secret_rule(conversation_text):
+                from skill.events import emit_event
+
+                emit_event("memory_rejected", status="rejected", thread_id=thread_id, agent_name=agent_name, reason=rule, signal_type="input")
                 return False
             
             # Build prompt
@@ -268,6 +298,11 @@ class MemoryUpdater:
             response = model.invoke(prompt)
             # 从AI的响应中提取纯文本，去除首位空格
             response_text = _extract_text(response.content).strip()
+            if rule := _secret_rule(response_text):
+                from skill.events import emit_event
+
+                emit_event("memory_rejected", status="rejected", thread_id=thread_id, agent_name=agent_name, reason=rule, signal_type="output")
+                return False
 
             # Parse response
             # Remove markdown code blocks if present
@@ -291,14 +326,32 @@ class MemoryUpdater:
             # 删除所有包含上传文件的摘要
             updated_memory = _strip_upload_mentions_from_memory(updated_memory)
 
-            return get_memory_storage().save(updated_memory, agent_name)
+            saved = get_memory_storage().save(updated_memory, agent_name)
+            from skill.events import emit_event
+
+            emit_event(
+                "memory_completed" if saved else "memory_failed",
+                status="completed" if saved else "failed",
+                thread_id=thread_id,
+                agent_name=agent_name,
+                signal_type="correction" if correction_detected else "reinforcement" if reinforcement_detected else "summary",
+            )
+            return saved
 
         except json.JSONDecodeError as e:
             preview = response_text[:300] if "response_text" in locals() else ""
             logger.warning("Failed to parse LLM response for memory update: %s; preview=%r", e, preview)
+            try:
+                _emit_memory_failure(thread_id, agent_name, "invalid_json")
+            except Exception:
+                pass
             return False
         except Exception as e:
             logger.exception("Memory update failed: %s", e)
+            try:
+                _emit_memory_failure(thread_id, agent_name, type(e).__name__)
+            except Exception:
+                pass
             return False
     
     def _apply_updates(

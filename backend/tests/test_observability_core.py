@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from config.observability_config import ObservabilityConfig
 from observability.recorder import ObservabilityRecorder
@@ -9,8 +8,45 @@ from observability.redaction import sanitize_preview
 from observability.store import ObservabilityStore
 
 
+def test_background_events_are_queryable_with_filters_and_metadata(tmp_path, monkeypatch):
+    import observability.web.app as web_app
+    from config.paths import Paths
+
+    monkeypatch.setattr(web_app, "get_paths", lambda: Paths(tmp_path / ".agentflow"))
+    store = ObservabilityStore(base_dir=tmp_path / ".agentflow")
+    store.insert_background_event(
+        {
+            "event_id": "event-1",
+            "created_at": "2026-08-13T00:00:00+00:00",
+            "event_type": "skill_create",
+            "status": "completed",
+            "thread_id": "thread-1",
+            "parent_thread_id": "parent-1",
+            "review_thread_id": "review-1",
+            "agent_name": "agent-a",
+            "skill": "python-debugging",
+            "action": "create",
+            "elapsed_ms": 12,
+            "model_name": "review-model",
+            "metadata": {"file_path": "SKILL.md"},
+        }
+    )
+
+    data = web_app._load_self_improvement(skill="python-debugging", limit=1)
+    assert data["total"] == 1
+    assert data["events"][0]["event_id"] == "event-1"
+    assert data["events"][0]["metadata"]["file_path"] == "SKILL.md"
+
+    detail = web_app.api_self_improvement_event
+    import asyncio
+
+    result = asyncio.run(detail("event-1"))
+    assert result["agent_name"] == "agent-a"
+    assert "content" not in result["metadata"]
+
+
 def test_redaction_masks_secrets_and_truncates():
-    payload = "api_key=sk-secret-1234567890 bearer Bearer abc.def.ghi"
+    payload = "api_key=«redacted:sk-…» bearer Bearer abc.def.ghi"
     result = sanitize_preview(payload, max_chars=20)
     assert "[REDACTED]" in result["preview"]
     assert result["redacted"] is True
@@ -72,6 +108,8 @@ def test_recorder_summary_mode_writes_thread_view_without_trace_file(tmp_path):
         status="ok",
         error_type=None,
         elapsed_ms=55,
+        started_at="2026-07-05T00:00:00Z",
+        ended_at="2026-07-05T00:00:01Z",
     )
     payload = recorder.end_trace(
         context,
@@ -208,6 +246,8 @@ def test_recovered_failure_is_recorded_in_trace_and_thread_summary(tmp_path):
         status="error",
         error_type="FileNotFoundError",
         elapsed_ms=12,
+        started_at="2026-07-05T00:00:00Z",
+        ended_at="2026-07-05T00:00:01Z",
     )
     recorder.record_tool_call(
         trace_id=context.trace_id,
@@ -218,6 +258,8 @@ def test_recovered_failure_is_recorded_in_trace_and_thread_summary(tmp_path):
         status="ok",
         error_type=None,
         elapsed_ms=20,
+        started_at="2026-07-05T00:00:00Z",
+        ended_at="2026-07-05T00:00:01Z",
     )
 
     payload = recorder.end_trace(
@@ -293,6 +335,8 @@ def test_success_status_is_not_counted_as_failure_unless_result_reports_error(tm
         status="success",
         error_type="tool_result_error",
         elapsed_ms=10,
+        started_at="2026-07-05T00:00:00Z",
+        ended_at="2026-07-05T00:00:01Z",
     )
     recorder.record_tool_call(
         trace_id=context.trace_id,
@@ -303,6 +347,8 @@ def test_success_status_is_not_counted_as_failure_unless_result_reports_error(tm
         status="success",
         error_type="tool_result_error",
         elapsed_ms=1000,
+        started_at="2026-07-05T00:00:00Z",
+        ended_at="2026-07-05T00:00:01Z",
     )
 
     payload = recorder.end_trace(
@@ -354,6 +400,8 @@ def test_unrecovered_failure_stays_visible(tmp_path):
         status="error",
         error_type="PermissionError",
         elapsed_ms=18,
+        started_at="2026-07-05T00:00:00Z",
+        ended_at="2026-07-05T00:00:01Z",
     )
 
     payload = recorder.end_trace(
