@@ -248,7 +248,7 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
         correction_detected = detect_correction(filtered_messages)
         reinforcement_detected = not correction_detected and detect_reinforcement(filtered_messages)
         queue = get_memory_queue()
-        queue.add(
+        queue.record_turn(
             thread_id=thread_id,
             messages=filtered_messages,
             agent_name=self._agent_name,

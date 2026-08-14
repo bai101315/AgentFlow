@@ -5,6 +5,8 @@ import abc
 import json
 import logging
 import threading
+import re
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -36,6 +38,49 @@ def create_empty_memory() -> dict[str, Any]:
         },
         "facts": [],
     }
+
+
+_PROCEDURAL_FACT_RE = re.compile(
+    r"(?:run|使用|调用|执行|排查|调试|修复|命令|command|tool call|工具调用|stack trace|traceback|/mnt/|\.py:|pytest|git (?: diff|status|commit))",
+    re.IGNORECASE,
+)
+
+
+def compress_memory_data(memory_data: dict[str, Any], max_facts: int = 40) -> dict[str, Any]:
+    """Deterministically remove stale metadata, duplicates, and procedures."""
+    data = json.loads(json.dumps(memory_data, ensure_ascii=False))
+    data["version"] = "1.1"
+    for group in ("user", "history"):
+        sections = data.get(group, {})
+        for name, section in sections.items():
+            if not isinstance(section, dict):
+                continue
+            summary = section.get("summary", "")
+            if not isinstance(summary, str):
+                section["summary"] = ""
+                continue
+            sentences = re.split(r"(?<=[.!?。！？])\s+", summary.strip())
+            if group == "user" and name == "topOfMind":
+                sentences = sentences[:3]
+            if group == "history" and name == "recentMonths":
+                sentences = sentences[:3]
+            section["summary"] = " ".join(sentences).strip()
+            section.pop("updatedAt", None)
+
+    unique: dict[str, dict[str, Any]] = {}
+    for fact in data.get("facts", []):
+        if not isinstance(fact, dict) or not isinstance(fact.get("content"), str):
+            continue
+        content = fact["content"].strip()
+        if not content or _PROCEDURAL_FACT_RE.search(content):
+            continue
+        key = re.sub(r"\s+", " ", content).casefold()
+        current = unique.get(key)
+        if current is None or (float(fact.get("confidence", 0) or 0), fact.get("createdAt", "")) > (float(current.get("confidence", 0) or 0), current.get("createdAt", "")):
+            unique[key] = dict(fact)
+    ranked = sorted(unique.values(), key=lambda item: (float(item.get("confidence", 0) or 0), item.get("createdAt", "")), reverse=True)
+    data["facts"] = ranked[:max_facts]
+    return data
 
 class MemoryStorage(abc.ABC):
     """Abstract base class for memory storage providers."""
@@ -103,6 +148,20 @@ class FileMemoryStorage(MemoryStorage):
         try:
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
+            if data.get("version") != "1.1":
+                try:
+                    config = get_memory_config()
+                    compressed = compress_memory_data(data, config.max_facts)
+                    if config.migration_backup:
+                        backup = file_path.with_name(file_path.name + ".bak")
+                        try:
+                            shutil.copy2(file_path, backup)
+                        except OSError:
+                            logger.warning("Failed to back up memory file before migration", exc_info=True)
+                    if self.save(compressed, agent_name):
+                        return compressed
+                except Exception:
+                    logger.warning("Memory migration failed; keeping original data", exc_info=True)
             return data
         except (json.JSONDecodeError, OSError) as e:
             logger.warning("Failed to load memory file: %s", e)

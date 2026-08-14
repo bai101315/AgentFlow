@@ -21,6 +21,21 @@ class ConversationContext:
     agent_name: str | None = None
     correction_detected: bool = False
     reinforcement_detected: bool = False
+    start_turn: int = 0
+    end_turn: int = 0
+    trigger: str = "turns"
+
+
+@dataclass
+class _SessionState:
+    seen_user_turns: int = 0
+    pending_messages: list[Any] = field(default_factory=list)
+    pending_start_turn: int = 0
+    correction_detected: bool = False
+    reinforcement_detected: bool = False
+    agent_name: str | None = None
+    time_timer: threading.Timer | None = None
+    pending_started_at: float | None = None
 
 class MemoryUpdateQueue:
     """Queue for memory updates with debounce mechanism.
@@ -38,6 +53,142 @@ class MemoryUpdateQueue:
         self._lock = threading.Lock()
         self._timer: threading.Timer | None = None
         self._processing = False
+        self._sessions: dict[str, _SessionState] = {}
+
+    @staticmethod
+    def _user_indexes(messages: list[Any]) -> list[int]:
+        return [i for i, message in enumerate(messages) if getattr(message, "type", None) == "human"]
+
+    def record_turn(
+        self,
+        thread_id: str,
+        messages: list[Any],
+        agent_name: str | None = None,
+        correction_detected: bool = False,
+        reinforcement_detected: bool = False,
+    ) -> bool:
+        """Record only the newest user turn from a session snapshot.
+
+        Returns ``True`` when a complete ``update_every_turns`` batch was queued.
+        The session cursor is independent for each thread and never stores the
+        complete conversation history.
+        """
+        config = get_memory_config()
+        if not config.enabled:
+            return False
+        user_indexes = self._user_indexes(messages)
+        with self._lock:
+            session = self._sessions.setdefault(thread_id, _SessionState())
+            if len(user_indexes) <= session.seen_user_turns:
+                return False
+            new_user_index = user_indexes[session.seen_user_turns]
+            new_messages = list(messages[new_user_index:])
+            session.seen_user_turns += 1
+            if not session.pending_messages:
+                session.pending_start_turn = session.seen_user_turns
+                session.pending_started_at = time.monotonic()
+            session.pending_messages.extend(new_messages)
+            session.agent_name = agent_name or session.agent_name
+            session.correction_detected |= correction_detected
+            session.reinforcement_detected |= reinforcement_detected and not correction_detected
+            interval = config.update_every_turns
+            if session.seen_user_turns % interval != 0:
+                if session.pending_start_turn == session.seen_user_turns:
+                    self._start_time_timer(thread_id)
+                return False
+            batch = ConversationContext(
+                thread_id=thread_id,
+                messages=session.pending_messages[-self._bounded_batch_messages(session.pending_messages, interval):],
+                agent_name=agent_name,
+                correction_detected=session.correction_detected,
+                reinforcement_detected=session.reinforcement_detected,
+                start_turn=session.pending_start_turn,
+                end_turn=session.seen_user_turns,
+                trigger="turns",
+            )
+            if session.time_timer is not None:
+                session.time_timer.cancel()
+                session.time_timer = None
+            session.pending_messages.clear()
+            session.pending_start_turn = 0
+            session.pending_started_at = None
+            session.correction_detected = False
+            session.reinforcement_detected = False
+            self._enqueue_context(batch)
+            self._reset_timer()
+            return True
+
+    def _start_time_timer(self, thread_id: str) -> None:
+        config = get_memory_config()
+        session = self._sessions[thread_id]
+        if session.time_timer is not None:
+            return
+        timer = threading.Timer(getattr(config, "time_trigger_seconds", 300), self._time_trigger, args=(thread_id,))
+        timer.daemon = True
+        session.time_timer = timer
+        timer.start()
+
+    def _time_trigger(self, thread_id: str) -> None:
+        with self._lock:
+            session = self._sessions.get(thread_id)
+            if session is None or not session.pending_messages:
+                return
+            session.time_timer = None
+            context = ConversationContext(
+                thread_id=thread_id,
+                messages=list(session.pending_messages),
+                agent_name=session.agent_name,
+                correction_detected=session.correction_detected,
+                reinforcement_detected=session.reinforcement_detected,
+                start_turn=session.pending_start_turn,
+                end_turn=session.seen_user_turns,
+                trigger="time",
+            )
+            session.pending_messages.clear()
+            session.pending_start_turn = 0
+            session.pending_started_at = None
+            session.correction_detected = False
+            session.reinforcement_detected = False
+            self._enqueue_context(context)
+            self._reset_timer()
+
+    @staticmethod
+    def _bounded_batch_messages(messages: list[Any], max_turns: int) -> int:
+        """Return a suffix ending at at most ``max_turns`` human turns."""
+        indexes = [i for i, msg in enumerate(messages) if getattr(msg, "type", None) == "human"]
+        return len(messages) if len(indexes) <= max_turns else len(messages) - indexes[-max_turns]
+
+    def should_update(self, thread_id: str) -> bool:
+        with self._lock:
+            if any(context.thread_id == thread_id for context in self._queue):
+                return True
+            session = self._sessions.get(thread_id)
+            if not session or not session.pending_messages:
+                return False
+            config = get_memory_config()
+            return (
+                session.seen_user_turns % config.update_every_turns == 0
+                or (
+                    session.pending_started_at is not None
+                    and time.monotonic() - session.pending_started_at >= getattr(config, "time_trigger_seconds", 300)
+                )
+            )
+
+    def take_pending_batch(self, thread_id: str) -> ConversationContext | None:
+        with self._lock:
+            for context in self._queue:
+                if context.thread_id == thread_id:
+                    self._queue.remove(context)
+                    return context
+        return None
+
+    def _replace_context(self, context: ConversationContext) -> None:
+        self._queue = [item for item in self._queue if item.thread_id != context.thread_id]
+        self._queue.append(context)
+
+    def _enqueue_context(self, context: ConversationContext) -> None:
+        """Append a generated batch without dropping another batch for the thread."""
+        self._queue.append(context)
 
     def add(
         self,
@@ -62,10 +213,7 @@ class MemoryUpdateQueue:
             return
         
         with self._lock:
-            existing_context = next(
-                (context for context in self._queue if context.thread_id == thread_id),
-                None,
-            )
+            existing_context = next((context for context in self._queue if context.thread_id == thread_id), None)
 
             merged_correction_detected = correction_detected or (existing_context.correction_detected if existing_context is not None else False)
             merged_reinforcement_detected = reinforcement_detected or (existing_context.reinforcement_detected if existing_context is not None else False)
@@ -80,8 +228,7 @@ class MemoryUpdateQueue:
             # If so, replace it with the newer one
 
             # 如果队列中有其他thread_id，说明应该被合并处理
-            self._queue = [c for c in self._queue if c.thread_id != thread_id]
-            self._queue.append(context)
+            self._replace_context(context)
             
             # Reset or start the debounce timer
             # 重置或启动防抖定时器
@@ -148,7 +295,15 @@ class MemoryUpdateQueue:
                 try:
                     from skill.events import emit_event
 
-                    emit_event("memory_started", status="running", thread_id=context.thread_id, agent_name=context.agent_name)
+                    emit_event(
+                        "memory_started",
+                        status="running",
+                        thread_id=context.thread_id,
+                        agent_name=context.agent_name,
+                        origin="conversation",
+                        execution_context="memory_update",
+                        trigger=context.trigger,
+                    )
                 except Exception:
                     pass
 
@@ -158,6 +313,7 @@ class MemoryUpdateQueue:
                     agent_name=context.agent_name,
                     correction_detected=context.correction_detected,
                     reinforcement_detected=context.reinforcement_detected,
+                    trigger=context.trigger,
                 )
                 if success:
                     logger.info("Memory updated successfully for thread %s", context.thread_id)
@@ -194,6 +350,27 @@ class MemoryUpdateQueue:
                     in_flight = True
                     pending: list[ConversationContext] = []
                 else:
+                    # Session tails below the interval are flushed on exit.
+                    for thread_id, session in self._sessions.items():
+                        if session.pending_messages:
+                            self._enqueue_context(ConversationContext(
+                                thread_id=thread_id,
+                                messages=list(session.pending_messages),
+                                start_turn=session.pending_start_turn,
+                                end_turn=session.seen_user_turns,
+                                correction_detected=session.correction_detected,
+                                reinforcement_detected=session.reinforcement_detected,
+                                agent_name=session.agent_name,
+                                trigger="flush",
+                            ))
+                            session.pending_messages.clear()
+                            session.pending_start_turn = 0
+                            session.pending_started_at = None
+                            session.correction_detected = False
+                            session.reinforcement_detected = False
+                        if session.time_timer is not None:
+                            session.time_timer.cancel()
+                            session.time_timer = None
                     in_flight = False
                     pending = self._queue.copy()
                     self._queue.clear()
@@ -219,6 +396,7 @@ class MemoryUpdateQueue:
                 self._timer = None
             discarded = len(self._queue)
             self._queue.clear()
+            self._sessions.clear()
         if discarded:
             try:
                 from skill.events import emit_event

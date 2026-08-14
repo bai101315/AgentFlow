@@ -1000,10 +1000,13 @@ class DeerFlowClient:
             "enabled": config.enabled,
             "storage_path": config.storage_path,
             "debounce_seconds": config.debounce_seconds,
+            "update_every_turns": config.update_every_turns,
+            "time_trigger_seconds": config.time_trigger_seconds,
             "max_facts": config.max_facts,
             "fact_confidence_threshold": config.fact_confidence_threshold,
             "injection_enabled": config.injection_enabled,
             "max_injection_tokens": config.max_injection_tokens,
+            "migration_backup": config.migration_backup,
         }
 
     def get_memory_status(self) -> dict:
@@ -1124,4 +1127,3 @@ if __name__ == "__main__":
     # Streaming
     for event in client.stream("hello"):
         print(event)
-

@@ -820,7 +820,7 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
     )
     # logger.info(prompt + f"\n<current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>")
 
-    return prompt + f"\n<current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>"
+    return prompt + f"\n<current_date>{datetime.now().astimezone().strftime('%Y-%m-%d, %A')}</current_date>"
 
 
 def build_session_prompt(

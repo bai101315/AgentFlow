@@ -16,6 +16,7 @@ import threading
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from config.paths import get_paths
@@ -25,6 +26,8 @@ logger = logging.getLogger(__name__)
 EVENTS_FILE_NAME = "events.jsonl"
 
 _write_lock = threading.Lock()
+_listeners_lock = threading.RLock()
+_listeners: set[Callable[[dict[str, Any]], None]] = set()
 
 
 def get_self_improvement_dir() -> Path:
@@ -33,6 +36,22 @@ def get_self_improvement_dir() -> Path:
 
 def get_events_file() -> Path:
     return get_self_improvement_dir() / EVENTS_FILE_NAME
+
+
+def subscribe(listener: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
+    """Subscribe to events emitted in this process.
+
+    Listeners are notification-only: failures are isolated in ``emit_event``
+    and can never affect the operation that produced the event.
+    """
+    with _listeners_lock:
+        _listeners.add(listener)
+
+    def unsubscribe() -> None:
+        with _listeners_lock:
+            _listeners.discard(listener)
+
+    return unsubscribe
 
 
 def emit_event(event: str, **fields: Any) -> None:
@@ -44,7 +63,10 @@ def emit_event(event: str, **fields: Any) -> None:
             "status", "thread_id", "parent_thread_id", "review_thread_id", "agent_name",
             "skill", "action", "elapsed_ms", "model_name", "reason", "applied", "max_actions",
             "signal_type", "origin", "execution_context", "scanner", "count",
-            "file_path",
+            "file_path", "created", "updated", "deleted",
+            "input_tokens", "output_tokens", "total_tokens",
+            "pruned",
+            "trigger",
         }
     }
     record = {
@@ -85,6 +107,14 @@ def emit_event(event: str, **fields: Any) -> None:
         })
     except Exception:
         logger.warning("Failed to write self-improvement event %s to observability DB", event, exc_info=True)
+
+    with _listeners_lock:
+        listeners = tuple(_listeners)
+    for listener in listeners:
+        try:
+            listener(dict(record))
+        except Exception:
+            logger.warning("Self-improvement event listener failed for %s", event, exc_info=True)
 
 
 def read_events(limit: int | None = None) -> list[dict[str, Any]]:

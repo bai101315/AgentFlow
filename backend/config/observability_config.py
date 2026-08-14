@@ -37,7 +37,7 @@ class ObservabilityConfig(BaseModel):
         description="Write a detailed trace JSON file when runtime diagnostics cross warning thresholds.",
     )
     slow_trace_ms: int = Field(
-        default=10000,
+        default=30000,
         description="Trace duration threshold that marks a run as slow.",
     )
     high_billable_input_tokens: int = Field(

@@ -28,17 +28,19 @@ class MemoryConfig(BaseModel):
         description="The class path for memory storage provider",
     )
     debounce_seconds: int = Field(
-        default=1,
+        default=10,
         ge=1,
         le=300,
         description="Seconds to wait before processing queued updates (debounce)",
     )
+    update_every_turns: int = Field(default=10, ge=1, le=100)
+    time_trigger_seconds: int = Field(default=300, ge=1, le=86400)
     model_name: str | None = Field(
         default=None,
         description="Model name to use for memory updates (None = use default model)",
     )
     max_facts: int = Field(
-        default=100,
+        default=40,
         ge=10,
         le=500,
         description="Maximum number of facts to store",
@@ -54,11 +56,12 @@ class MemoryConfig(BaseModel):
         description="Whether to inject memory into system prompt",
     )
     max_injection_tokens: int = Field(
-        default=2000,
+        default=1500,
         ge=100,
         le=8000,
         description="Maximum tokens to use for memory injection",
     )
+    migration_backup: bool = Field(default=True)
 
 
 # Global configuration instance

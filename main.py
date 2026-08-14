@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from until import *
 
 try:
-    from prompt_toolkit import PromptSession
+    from prompt_toolkit import PromptSession, print_formatted_text
     from prompt_toolkit.formatted_text import ANSI
     from prompt_toolkit.history import InMemoryHistory
 
@@ -49,6 +49,52 @@ _SOUL_REQUIRED_HEADERS = (
 _DEFAULT_AGENT_ALIASES = {"", "default", "test", "none", "null"}
 _OBSERVABILITY_HOST = "127.0.0.1"
 _OBSERVABILITY_PORT = 8081
+
+
+def _print_self_improvement_event(record: dict[str, Any]) -> None:
+    """Render successful Memory/Skill changes as an immediate CLI notice."""
+    event = record.get("event", "")
+    if event == "memory_completed" and record.get("status") == "completed":
+        created = int(record.get("created", 0) or 0)
+        updated = int(record.get("updated", 0) or 0)
+        deleted = int(record.get("deleted", 0) or 0)
+        if not (created or updated or deleted):
+            return
+        parts = []
+        if created:
+            parts.append(f"{GREEN}created {created}{RESET}")
+        if updated:
+            parts.append(f"{YELLOW}updated {updated}{RESET}")
+        if deleted:
+            parts.append(f"{RED}deleted {deleted}{RESET}")
+        message = f"\n{CYAN}{BOLD}[Memory]{RESET} " + ", ".join(parts)
+    elif event.startswith("skill_"):
+        action = record.get("action") or event.removeprefix("skill_")
+        operation = {
+            "create": ("created", GREEN),
+            "edit": ("updated", YELLOW),
+            "patch": ("updated", YELLOW),
+            "write_file": ("updated", YELLOW),
+            "delete": ("deleted", RED),
+            "remove_file": ("deleted", RED),
+        }.get(action)
+        if operation is None:
+            return
+        verb, color = operation
+        name = record.get("skill", "unknown")
+        file_path = record.get("file_path")
+        suffix = f" ({file_path})" if file_path and file_path != "SKILL.md" else ""
+        message = f"\n{MAGENTA}{BOLD}[Skill]{RESET} {color}{verb}{RESET}: {name}{suffix}"
+    else:
+        return
+
+    try:
+        if _HAS_PROMPT_TOOLKIT:
+            print_formatted_text(ANSI(message))
+        else:
+            print(message)
+    except Exception:
+        print(message)
 
 
 def _logging_level_from_config(name: str) -> int:
@@ -149,18 +195,18 @@ def _save_last_agent(agent_name: str) -> None:
 
 
 def _flush_memory_queue() -> None:
-    """Discard pending memory updates on shutdown without calling a model.
+    """Flush pending memory updates before shutdown.
 
     The memory debounce timer runs on a daemon thread: if the process exits
-    before the timer fires, queued updates would be lost and no memory file
-    would ever be written.  Call this on every exit path.
+    before the timer fires, queued updates would be lost. Call the queue's
+    synchronous flush on every exit path so short sessions are persisted.
     """
     try:
         from agents.memory.queue import get_memory_queue
 
-        discarded = get_memory_queue().discard_pending()
-        if discarded:
-            print(f"Memory updates discarded: {discarded} pending update(s).")
+        flushed = get_memory_queue().flush()
+        if flushed:
+            print(f"Memory updates flushed: {flushed} pending update(s).")
     except Exception as exc:
         print(f"Warning: failed to flush memory updates: {exc}")
 
@@ -856,6 +902,7 @@ async def main(args: argparse.Namespace) -> None:
     from config.app_config import reload_app_config
     from deer_flow_mcp import initialize_mcp_tools
     from observability import ObservabilityMiddleware, get_observability_recorder
+    from skill.events import subscribe
     record_startup_timing("imports", phase_started_at)
 
     phase_started_at = perf_counter()
@@ -880,6 +927,7 @@ async def main(args: argparse.Namespace) -> None:
         agent = None
         observability_recorder = get_observability_recorder()
         current_observability_mode = observability_recorder.config.content_mode
+        unsubscribe_self_improvement_events = subscribe(_print_self_improvement_event)
 
         def _current_model_name() -> str | None:
             return config.get("configurable", {}).get("model_name") or config.get("configurable", {}).get("model")
@@ -1049,6 +1097,7 @@ async def main(args: argparse.Namespace) -> None:
                     _finalize_session("user_exit")
                     _flush_memory_queue()
                     _drain_background_reviews()
+                    unsubscribe_self_improvement_events()
                     print("Goodbye!")
                     break
 
@@ -1095,6 +1144,7 @@ async def main(args: argparse.Namespace) -> None:
                 _finalize_session("keyboard_interrupt")
                 _flush_memory_queue()
                 _drain_background_reviews()
+                unsubscribe_self_improvement_events()
                 print("Goodbye!")
                 break
             except Exception as exc:

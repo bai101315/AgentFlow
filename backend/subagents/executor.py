@@ -7,7 +7,7 @@ import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -266,7 +266,7 @@ class SubagentExecutor:
             
             result.status = SubagentStatus.FAILED
             result.error = str(e)
-            result.completed_at = datetime.now()
+            result.completed_at = datetime.now(UTC)
             return result
 
     def _execute_in_isolated_loop(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
@@ -339,7 +339,7 @@ class SubagentExecutor:
                 task_id=task_id,
                 trace_id=self.trace_id,
                 status=SubagentStatus.RUNNING,
-                started_at=datetime.now(),
+                started_at=datetime.now(UTC),
             )
         
         try:
@@ -371,7 +371,7 @@ class SubagentExecutor:
                     if result.status == SubagentStatus.RUNNING:
                         result.status = SubagentStatus.CANCELLED
                         result.error = "Cancelled by user"
-                        result.completed_at = datetime.now()
+                        result.completed_at = datetime.now(UTC)
                 return result
 
             async for chunk in agent.astream(state, config=run_config, context=context, stream_mode="values"):  # type: ignore[arg-type]
@@ -387,7 +387,7 @@ class SubagentExecutor:
                         if result.status == SubagentStatus.RUNNING:
                             result.status = SubagentStatus.CANCELLED
                             result.error = "Cancelled by user"
-                            result.completed_at = datetime.now()
+                            result.completed_at = datetime.now(UTC)
                     return result
                 
                 final_state = chunk
@@ -491,12 +491,12 @@ class SubagentExecutor:
                     result.result = "No response generated"
 
             result.status = SubagentStatus.COMPLETED
-            result.completed_at = datetime.now()
+            result.completed_at = datetime.now(UTC)
         except Exception as e:
             logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} async execution failed")
             result.status = SubagentStatus.FAILED
             result.error = str(e)
-            result.completed_at = datetime.now()
+            result.completed_at = datetime.now(UTC)
         
         return result
     
@@ -531,7 +531,7 @@ class SubagentExecutor:
         def run_task():
             with _background_tasks_lock:
                 _background_tasks[task_id].status = SubagentStatus.RUNNING
-                _background_tasks[task_id].started_at = datetime.now()
+                _background_tasks[task_id].started_at = datetime.now(UTC)
                 result_holder = _background_tasks[task_id]
 
             try:
@@ -545,7 +545,7 @@ class SubagentExecutor:
                         _background_tasks[task_id].status = exec_result.status
                         _background_tasks[task_id].result = exec_result.result
                         _background_tasks[task_id].error = exec_result.error
-                        _background_tasks[task_id].completed_at = datetime.now()
+                        _background_tasks[task_id].completed_at = datetime.now(UTC)
                         _background_tasks[task_id].ai_messages = exec_result.ai_messages
                 except FuturesTimeoutError:
                     logger.error(f"[trace={self.trace_id}] Subagent {self.config.name} execution timed out after {self.config.timeout_seconds}s")
@@ -553,7 +553,7 @@ class SubagentExecutor:
                         if _background_tasks[task_id].status == SubagentStatus.RUNNING:
                             _background_tasks[task_id].status = SubagentStatus.TIMED_OUT
                             _background_tasks[task_id].error = f"Execution timed out after {self.config.timeout_seconds} seconds"
-                            _background_tasks[task_id].completed_at = datetime.now()
+                            _background_tasks[task_id].completed_at = datetime.now(UTC)
                     # Signal cooperative cancellation and cancel the future
                     result_holder.cancel_event.set()
                     execution_future.cancel()
@@ -562,7 +562,7 @@ class SubagentExecutor:
                 with _background_tasks_lock:
                     _background_tasks[task_id].status = SubagentStatus.FAILED
                     _background_tasks[task_id].error = str(e)
-                    _background_tasks[task_id].completed_at = datetime.now()
+                    _background_tasks[task_id].completed_at = datetime.now(UTC)
 
         _scheduler_pool.submit(run_task)
         return task_id
