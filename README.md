@@ -12,7 +12,7 @@ The current product surface is intentionally small: a local CLI and an embedded 
 - Avoid exposing every MCP or local tool to every model by default.
 - Make long-running conversations resumable through checkpointed state.
 - Preserve durable user and project context without storing transient task noise.
-- Support skill creation and patching through a governed write path.
+- Support skill creation, patching, archiving, restoring, and consolidation through a governed write path.
 - Keep local execution practical on Windows while making permission boundaries explicit.
 - Build toward tool-use evaluation instead of relying on ad hoc demos.
 
@@ -23,6 +23,7 @@ The current product surface is intentionally small: a local CLI and an embedded 
 - Memory: store compact long-term facts and inject them into future sessions.
 - Session search: index user and assistant turns into SQLite FTS for cross-session recall.
 - Skills: load public/custom skills and update custom skills through `skill_manage` with validation and history.
+- Skill lifecycle: Curator automatically transitions inactive skills (active → stale → archived), consolidates overlapping skills via LLM, and supports restore from archive with full backup safety.
 - Middleware: compose memory updates, session indexing, loop detection, prompt caching, clarification, and tool error handling.
 <!-- [DEPRECATED] sandbox configuration removed:
 - Local sandbox mapping: run local file operations against controlled workspace paths; host bash is opt-in and should remain disabled for demos.

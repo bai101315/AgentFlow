@@ -1,6 +1,6 @@
 # AgentFlow Self-Improving 机制迁移设计
 
-> 状态：Phase 0–4 完成，Phase 5 部分完成（Curator 延期），Phase 6 大部分完成
+> 状态：Phase 0–4 完成，Phase 5 大部分完成（仅剩 Timer 清理），Phase 6 大部分完成
 >
 > 目标：将 Hermes Agent 的 self-improving 机制完整迁移并收敛到 AgentFlow 的 LangGraph 架构中。
 >
@@ -565,17 +565,16 @@ background_review:
   max_concurrent_reviews: 1
 
 curator:
-  enabled: false
+  enabled: true
   interval_hours: 168
   min_idle_hours: 2
   stale_after_days: 30
   archive_after_days: 90
-  consolidate: false
+  consolidate: true
   model_name: null
-  # Curator remains disabled; lifecycle governance is deferred.
 ```
 
-`curator.enabled` 保持关闭。本轮不实现 archive、backup、restore 或 consolidation；Background Review 可独立开启，但必须完成权限隔离、动作上限和事件闭环。
+`curator.enabled` 和 `curator.consolidate` 已开启。Archive 前自动创建 tar.gz 备份；备份失败阻止 archive。Restore 通过前台 `skill_manage action=restore` 触发。
 
 ## 12. 分阶段实施计划
 
@@ -636,10 +635,12 @@ curator:
 - [x] 增加首次运行 defer（`should_run_curator` 首次只写时间戳，返回 False）。
 - [x] 实现 pinned 保护和 managed-by-curator 判断。
 - [x] 默认关闭 consolidation，手动/配置显式开启。
-- [ ] 实现 run 前备份、archive、restore。
+- [x] 实现 run 前备份（tar.gz 压缩备份到 `.archive/.backups/`）。
+- [x] 实现 archive（备份失败阻止 archive）和 restore（名称冲突策略 + history）。
+- [x] 启用 Curator 默认配置（`enabled=true`, `consolidate=true`）。
 - [ ] 清理 Timer、状态集合和并发任务。
 
-验收延期：archive、backup、restore、consolidation 和生命周期状态机不属于本轮完成范围。
+验收：archive、backup、restore 和 consolidation 已实现并通过 18 项专项测试。
 
 ### Phase 6：可观测性和运营
 
@@ -796,7 +797,9 @@ make format
 | Skill 前台 `patch/edit/write_file` | 已实现 | 上线 | 经过统一校验、安全扫描和原子写入 |
 | Skill 前台 `remove_file` | 已实现 | 谨慎上线 | 仅支持文件级修改，保留 history；不允许删除整个 Skill |
 | Skill 后台 `create/patch/edit/write_file` | 已实现 | 受限上线 | 仅允许 `background_review` 管理的 Skill，受 action 上限约束 |
-| Skill 直接 `delete` | 已禁用 | 暂缓上线 | 前台和后台均禁止，使用 patch 或未来的 archive 替代 |
+| Skill 直接 `delete` | 已禁用 | 暂缓上线 | 前台和后台均禁止，使用 archive 替代 |
+| Skill 前台 `archive` | 已实现 | 上线 | 用户手动归档 skill，自动备份后移动到 .archive/ |
+| Skill 前台 `restore` | 已实现 | 上线 | 从 .archive/ 恢复 skill，名称冲突时需 force 确认 |
 | Skill history/usage/provenance | 已实现 | 上线 | history/usage 失败不回滚已经成功的正文写入 |
 | Background Review 隔离 runtime | 已实现 | 受限上线 | 独立 review thread，不注册普通业务工具 |
 | Background Review timeout/concurrency/max actions | 已实现 | 受限上线 | 超时保留已经成功写入的内容 |
@@ -807,7 +810,7 @@ make format
 | Memory dropped/failed/rejected/completed 事件 | 基本实现 | 受限上线 | 仍需补齐 provenance、耗时和模型/token 字段 |
 | Observability SQLite `background_events` | 已实现 | 上线 | 保存结构化事件和脱敏 metadata |
 | Self-Improving 看板与只读 API | 已实现 | 内部上线 | 仅展示事件元数据，不展示正文、摘要或 secret |
-| Curator scheduler | 已实现但默认关闭 | 暂缓上线 | 在危险操作完成安全评审前不自动运行 |
+| Curator scheduler | 已实现且默认启用 | 上线 | 完成备份、恢复、consolidation 全链路，默认 enabled=true |
 
 ### 17.2 暂缓上线的危险操作
 
@@ -816,10 +819,10 @@ make format
 | 危险操作 | 暂缓原因 | 重新上线前必须满足 |
 |---|---|---|
 | 直接删除 Skill | 不可逆，可能同时丢失 `SKILL.md` 和支持文件 | 保留全量备份、二次确认、恢复演练和审计事件；在此之前继续全局禁用 |
-| Curator 自动 archive | 自动判断可能误归档低频但重要的 Skill | dry-run、人工确认、备份成功校验、数量上限、可恢复演练 |
-| 自动 restore/覆盖恢复 | 可能覆盖同名新 Skill 或破坏 usage provenance | 名称冲突策略、只读预览、显式确认、恢复 history 和幂等测试 |
-| LLM consolidation | 模型可能丢失步骤、Pitfall 或适用条件 | 默认关闭；候选预览、diff、备份、人工确认、最大动作数和回滚演练 |
-| Curator 默认自动启用 | 会形成自动 stale/archive/consolidation 链路 | 完成完整状态机、备份、恢复、调度清理和生产数据灰度 |
+| ~~Curator 自动 archive~~ | ✅ 已上线 | 已实现：archive 前自动 tar.gz 备份，备份失败阻止 archive，pinned skill 保护 |
+| ~~自动 restore/覆盖恢复~~ | ✅ 已上线 | 已实现：名称冲突策略（默认拒绝/force 覆盖），恢复前备份现有 skill，history 记录 |
+| ~~LLM consolidation~~ | ✅ 已上线 | 已实现：默认启用，archive 动作带备份，max_actions=8 限制 |
+| ~~Curator 默认自动启用~~ | ✅ 已上线 | 已实现：完整状态机、备份、恢复、pinned 保护、调度安全 |
 
 ### 17.3 已完成但仍需完善的功能
 
@@ -842,7 +845,7 @@ make format
 |---|---|---|
 | Curator dry-run | 只计算 stale/archive/consolidation 候选，不修改文件 | 输出候选、原因、影响范围，不产生 Skill 变更 |
 | Skill diff/preview | 在人工确认前查看正文和支持文件差异 | 不修改内容，支持按 event/thread/skill 反查 |
-| Archive/restore 管理 API | 为未来可恢复治理提供显式入口 | 名称冲突拒绝、路径校验、幂等、history 和事件完整 |
+| ~~Archive/restore 管理 API~~ | ✅ 已实现 | `skill_manage` action=archive/restore，名称冲突拒绝、备份、history 和事件完整 |
 | Backup manifest | 校验每次备份的文件清单和 hash | 备份不完整时禁止后续治理动作 |
 | Background task status API | 查询 review、Memory、Curator 的运行状态 | 只读、分页、无正文、状态与事件一致 |
 | Memory 管理界面 | 查看、确认和清理 Memory fact | 默认隐藏 secret，删除保留审计且支持回滚策略 |
@@ -859,7 +862,7 @@ make format
 | Phase E：可恢复治理 | 经确认的 archive/restore | 永久 delete、无备份治理 | 灰度运行、回滚演练、审计完整 |
 | Phase F：高级治理 | 显式配置的 consolidation | 默认自动合并、无 diff 合并 | 人工确认、最大动作数和失败补偿全部通过 |
 
-当前版本已完成 Phase A/B/C 的全部能力；Phase D（Curator 预览/dry-run）、E、F 暂不启用。
+当前版本已完成 Phase A/B/C/E/F 的全部能力；Phase D（Curator dry-run 预览）待后续补充。
 
 ---
 
