@@ -49,7 +49,7 @@ class CuratorConfig(BaseModel):
     """Configuration for long-running custom skill lifecycle maintenance."""
 
     enabled: bool = Field(
-        default=False,
+        default=True,
         description="Whether to schedule skill curator lifecycle checks.",
     )
     interval_hours: float = Field(
@@ -73,7 +73,7 @@ class CuratorConfig(BaseModel):
         description="Days without activity before a stale managed skill is archived.",
     )
     consolidate: bool = Field(
-        default=False,
+        default=True,
         description="Whether to run an optional LLM consolidation pass after deterministic lifecycle changes.",
     )
     model_name: str | None = Field(

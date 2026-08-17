@@ -247,9 +247,9 @@ async def _skill_manage_impl(
     """Manage custom skills under skills/custom/.
 
     Args:
-        action: One of create, patch, edit, write_file, remove_file. Direct Skill deletion is disabled.
+        action: One of create, patch, edit, write_file, remove_file, archive, restore. Direct Skill deletion is disabled.
         name: Skill name in hyphen-case.
-        content: New file content for create, edit, or write_file.
+        content: New file content for create, edit, or write_file. Pass "force" for restore to overwrite existing.
         path: Supporting file path for write_file or remove_file.
         find: Existing text to replace for patch.
         replace: Replacement text for patch.
@@ -432,6 +432,50 @@ async def _skill_manage_impl(
             )
             return f"Removed '{path}' from custom skill '{name}'."
 
+        if action == "archive":
+            await _to_thread(ensure_custom_skill_is_editable, name)
+            prev_content = await _to_thread(read_custom_skill_content, name)
+            from skill.curator import archive_custom_skill, _mark_archived, _now as curator_now
+
+            archive_path = await _to_thread(archive_custom_skill, name)
+            await _to_thread(_mark_archived, name, archive_path, now=curator_now())
+            await _to_thread(
+                finalize,
+                action="archive",
+                file_path="SKILL.md",
+                prev_content=prev_content,
+                new_content=None,
+                scanner={"decision": "allow", "reason": "User-initiated archive."},
+                agent_name=agent_name,
+                model_name=model_name,
+            )
+            try:
+                await refresh_skills_system_prompt_cache_async()
+            except Exception:
+                logger.warning("Failed to refresh Skill prompt cache after archive '%s'", name, exc_info=True)
+            return f"Archived custom skill '{name}' to {archive_path}."
+
+        if action == "restore":
+            from skill.curator import restore_archived_skill
+
+            force = content == "force"
+            restored_path = await _to_thread(restore_archived_skill, name, force=force)
+            await _to_thread(
+                finalize,
+                action="restore",
+                file_path="SKILL.md",
+                prev_content=None,
+                new_content=None,
+                scanner={"decision": "allow", "reason": "User-initiated restore."},
+                agent_name=agent_name,
+                model_name=model_name,
+            )
+            try:
+                await refresh_skills_system_prompt_cache_async()
+            except Exception:
+                logger.warning("Failed to refresh Skill prompt cache after restore '%s'", name, exc_info=True)
+            return f"Restored custom skill '{name}' to {restored_path}."
+
         if await _to_thread(public_skill_exists, name):
             raise ValueError(f"'{name}' is a built-in skill. To customise it, create a new skill with the same name under skills/custom/.")
         raise ValueError(f"Unsupported action '{action}'.")
@@ -454,9 +498,9 @@ async def skill_manage_tool(
     """Manage custom skills under skills/custom/.
 
     Args:
-        action: One of create, patch, edit, write_file, remove_file. Direct Skill deletion is disabled.
+        action: One of create, patch, edit, write_file, remove_file, archive, restore. Direct Skill deletion is disabled.
         name: Skill name in hyphen-case.
-        content: New file content for create, edit, or write_file.
+        content: New file content for create, edit, or write_file. Pass "force" for restore to overwrite existing.
         path: Supporting file path for write_file or remove_file.
         find: Existing text to replace for patch.
         replace: Replacement text for patch.

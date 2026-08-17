@@ -1,35 +1,41 @@
 # AGENTS.md — AgentFlow 项目规则
 
-本文件为项目内最高优先级规则,任何在该仓库内工作的 agent 必须遵守。
+## 🚨 强制规则：未读代码禁止回答
 
-## ⭐ 最高优先级:证据优先(Evidence-first)
+在回答任何关于代码的问题、给出任何建议或结论之前，你必须完成以下步骤：
 
-任何**操作**或**结论**,必须先阅读相关源码或数据,提供可靠性支撑,方可执行或给出。
+### 必做步骤（缺一不可）
 
-具体要求:
+1. **读取相关源码** — 用 Read 工具读取你将要讨论的文件。没有读过源码 = 不能谈论该代码。
+2. **给出代码证据** — 回答必须包含具体文件路径和行号（如 `backend/agents/review_agent.py:142`）以及关键代码片段。
+3. **区分事实与推测** — 如果你没有读到相关代码，明确说"我没有读过这部分代码，无法确认"。
 
-1. **结论必须有依据** — 回答"为什么/是什么/是否有问题"时,必须引用:
-   - 源码位置(`path:line`)与关键代码摘录;
-   - 实际数据(日志、事件、数据库、配置文件内容);
-   - 真实命令输出(测试结果、lint 结果、运行输出)。
-   禁止凭印象、推测或"我记得"下结论。
+### 禁止行为
 
-2. **操作前必须读代码** — 修改、删除、诊断前,先读目标文件及相关调用链,
-   确认符号/接口/行为的真实形态,不得假设。
+- ❌ 没有读过文件就评论代码质量、给出修改建议
+- ❌ 回答"为什么"、"是什么"、"是否有问题"时不引用具体代码
+- ❌ 用"可能"、"应该"、"我记得"替代实际代码证据
+- ❌ 声称已修复/已通过但没有工具输出支撑
+- ❌ 复述你的推测作为事实
 
-3. **验证必须真实** — 声称"已修复/已通过"必须有对应工具输出支撑
-   (pytest 输出、命令 exit code、文件落盘确认等)。禁止编造结果。
+### 回答前自检清单
 
-4. **先核实后评判** — 对第三方报告、他人结论、AI 生成的分析,先逐条对照
-   当前代码/数据核实,再确认或反驳,不直接采信。
+在输出回答之前，必须确认以下条件全部满足：
 
-5. **证据不足时明确说明** — 无法读取数据或被拒绝时,明确说明证据缺口,
-   给出自查路径,不得用推断填补。
+- [ ] 我已用 Read 工具读取了相关源码文件
+- [ ] 我的回答基于实际读取的代码，不是基于记忆或推测
+- [ ] 回答中包含具体的文件路径和行号
+- [ ] 如果无法确认，已明确说明证据缺口
 
-## 项目背景(供快速定位)
+---
 
-- AgentFlow:DeerFlow 风格 agent 框架,backend/ 含 self-improving 机制
-  (skill_manage 工具 / background review agent / curator / memory 中间件)。
-- 关键目录:backend/agents/(中间件、review_agent、memory)、
-  backend/skill/(manager/curator/usage/validation)、backend/observability/。
-- 配置:config.yaml;数据目录:.agentflow/(observability.db、events.jsonl 等)。
+## 项目背景（快速定位）
+
+- **框架**: DeerFlow 风格 agent 框架
+- **核心目录**:
+  - `backend/agents/` — 中间件、review_agent、memory
+  - `backend/skill/` — manager / curator / usage / validation
+  - `backend/observability/` — 可观测性
+- **配置**: `config.yaml`
+- **数据**: `.agentflow/` (observability.db, events.jsonl 等)
+- **Self-improving 机制**: skill_manage 工具 / background review agent / curator / memory 中间件

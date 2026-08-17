@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import shutil
+import tarfile
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -14,12 +15,19 @@ from typing import Any
 
 from config.self_improvement_config import CuratorConfig
 from skill.action_parsing import parse_actions_json
-from skill.manager import get_custom_skill_dir, get_custom_skills_dir, validate_skill_name
-from skill.usage import is_curator_managed, read_usage, write_usage
+from skill.manager import (
+    append_history,
+    custom_skill_exists,
+    get_custom_skill_dir,
+    get_custom_skills_dir,
+    validate_skill_name,
+)
+from skill.usage import ORIGIN_FOREGROUND_USER, _usage_lock, is_curator_managed, read_usage, write_usage
 
 logger = logging.getLogger(__name__)
 
 ARCHIVE_DIR_NAME = ".archive"
+BACKUP_DIR_NAME = ".backups"
 CURATOR_STATE_FILE_NAME = ".curator_state.json"
 
 _CONSOLIDATION_PROMPT = """You are a skill curator.
@@ -39,6 +47,29 @@ def get_archive_dir() -> Path:
     path = get_custom_skills_dir() / ARCHIVE_DIR_NAME
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def get_backup_dir() -> Path:
+    """Return skills/custom/.archive/.backups/, creating if needed."""
+    path = get_archive_dir() / BACKUP_DIR_NAME
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def backup_skill(name: str) -> Path:
+    """Create a compressed backup of a skill directory before destructive action.
+
+    Raises OSError or FileNotFoundError on failure — caller must abort.
+    """
+    name = validate_skill_name(name)
+    source = get_custom_skill_dir(name)
+    if not source.exists():
+        raise FileNotFoundError(f"Cannot backup: skill '{name}' directory not found.")
+    timestamp = _now().strftime("%Y%m%dT%H%M%SZ")
+    backup_path = get_backup_dir() / f"{name}-{timestamp}.tar.gz"
+    with tarfile.open(backup_path, "w:gz") as tar:
+        tar.add(str(source), arcname=name)
+    return backup_path
 
 
 def get_curator_state_file() -> Path:
@@ -71,12 +102,18 @@ def _archive_target(name: str) -> Path:
     return root / f"{name}-{suffix}"
 
 
-def archive_custom_skill(name: str) -> Path:
-    """Move a custom skill directory into skills/custom/.archive/."""
+def archive_custom_skill(name: str, *, skip_backup: bool = False) -> Path:
+    """Move a custom skill directory into skills/custom/.archive/.
+
+    Creates a compressed backup first unless skip_backup is True.
+    Backup failure prevents the archive (§13.5 contract).
+    """
     name = validate_skill_name(name)
     source = get_custom_skill_dir(name)
     if not source.exists():
         raise FileNotFoundError(f"Custom skill '{name}' not found.")
+    if not skip_backup:
+        backup_skill(name)
     target = _archive_target(name)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(source), str(target))
@@ -90,6 +127,106 @@ def _mark_archived(name: str, archive_path: Path, *, now: datetime) -> None:
     record["archived_at"] = now.isoformat()
     record["archive_path"] = str(archive_path)
     write_usage(usage)
+
+
+def list_archived_skills() -> list[dict[str, Any]]:
+    """List all skills currently in the archive with metadata."""
+    usage = read_usage()
+    results: list[dict[str, Any]] = []
+    for name, record in usage.get("skills", {}).items():
+        if not isinstance(record, dict):
+            continue
+        if record.get("state") == "archived":
+            results.append({
+                "name": name,
+                "archive_path": record.get("archive_path"),
+                "archived_at": record.get("archived_at"),
+            })
+    # Also scan for orphaned directories not tracked in usage
+    archive_dir = get_archive_dir()
+    tracked_paths = {r["archive_path"] for r in results if r.get("archive_path")}
+    for entry in archive_dir.iterdir():
+        if entry.name == BACKUP_DIR_NAME or not entry.is_dir():
+            continue
+        if str(entry) not in tracked_paths:
+            results.append({
+                "name": entry.name,
+                "archive_path": str(entry),
+                "archived_at": None,
+            })
+    return results
+
+
+def restore_archived_skill(name: str, *, force: bool = False) -> Path:
+    """Restore an archived skill back to the active custom skills directory.
+
+    Args:
+        name: Original skill name.
+        force: If True, overwrite an existing active skill with the same name.
+
+    Raises:
+        FileNotFoundError: If no archived version of the skill can be found.
+        ValueError: If an active skill with the same name exists and force=False.
+    """
+    name = validate_skill_name(name)
+
+    if not force and custom_skill_exists(name):
+        raise ValueError(
+            f"Active skill '{name}' already exists. Use force=True to overwrite, "
+            "or archive/rename the existing skill first."
+        )
+
+    # Find archive path from usage metadata
+    usage = read_usage()
+    record = usage.get("skills", {}).get(name, {})
+    archive_path: Path | None = None
+
+    if isinstance(record, dict) and record.get("state") == "archived" and record.get("archive_path"):
+        candidate = Path(record["archive_path"])
+        if candidate.exists():
+            archive_path = candidate
+
+    # Fallback: scan archive directory
+    if archive_path is None:
+        archive_dir = get_archive_dir()
+        candidate = archive_dir / name
+        if candidate.exists():
+            archive_path = candidate
+        else:
+            matches = sorted(archive_dir.glob(f"{name}-*"), reverse=True)
+            if matches:
+                archive_path = matches[0]
+
+    if archive_path is None or not archive_path.exists():
+        raise FileNotFoundError(f"No archived version of skill '{name}' found.")
+
+    target = get_custom_skill_dir(name)
+    if target.exists():
+        backup_skill(name)
+        shutil.rmtree(target)
+
+    shutil.move(str(archive_path), str(target))
+
+    # Update usage metadata
+    now = _now()
+    with _usage_lock:
+        data = read_usage()
+        skills = data.setdefault("skills", {})
+        rec = skills.setdefault(name, {})
+        rec["state"] = "active"
+        rec.pop("archived_at", None)
+        rec.pop("archive_path", None)
+        rec["last_activity_at"] = now.isoformat()
+        write_usage(data)
+
+    append_history(name, {
+        "action": "restore",
+        "origin": ORIGIN_FOREGROUND_USER,
+        "restored_from": str(archive_path),
+        "timestamp": now.isoformat(),
+    })
+
+    return target
 
 
 def apply_automatic_transitions(config: CuratorConfig, *, now: datetime | None = None) -> dict[str, Any]:

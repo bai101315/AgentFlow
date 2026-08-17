@@ -1,6 +1,6 @@
 # AgentFlow Self-Improving 机制迁移设计
 
-> 状态：实现设计基线
+> 状态：Phase 0–4 完成，Phase 5 部分完成（Curator 延期），Phase 6 大部分完成
 >
 > 目标：将 Hermes Agent 的 self-improving 机制完整迁移并收敛到 AgentFlow 的 LangGraph 架构中。
 >
@@ -46,14 +46,21 @@ AgentFlow 已具备以下基础模块：
 | Curator | `backend/skill/curator.py`、`curator_middleware.py` | 代码保留但当前关闭；archive/backup/restore/consolidation 不在本轮范围 |
 | 配置 | `config.yaml`、`backend/config/self_improvement_config.py` | 已有配置，但默认值与安全策略需统一 |
 
-当前实现与 Hermes 的主要差距：
+已解决的差距（保留历史记录）：
 
-1. Hermes 的 Background Review 是隔离 fork Agent；AgentFlow 当前主要是“模型输出结构化 action，宿主直接执行 action”。短期可以保留该路径，但必须补齐执行上下文隔离、写入溯源和权限边界。
-2. `Skill` 使用统计必须接到真实 `skill_view`/技能注入路径，否则 Curator 会错误判断技能长期未使用。
-3. 当前 `skill.usage` 的 `_default_record()` 默认 `created_by="agent"`，会混淆用户创建技能和后台创建技能；必须改成显式 provenance。
-4. `config.yaml` 中 Curator 当前存在 `interval_hours: 0` 等危险组合，必须禁止恒真调度和过短生命周期。
-5. 后台 review 的 `asyncio.run()` 只能在线程中使用；如果未来从已有事件循环调用，必须统一异步调度入口。
-6. 后台状态集合、线程状态和已见 tool call 必须有清理策略，避免长生命周期服务内存增长。
+1. ~~Hermes 的 Background Review 是隔离 fork Agent~~ → 已实现独立 `review_agent/runtime.py`，工具集通过 `build_background_skill_manage_tool` 限制为 skill_manage/skills_list/skill_view，不注册普通业务工具。
+2. ~~`Skill` 使用统计必须接到真实路径~~ → `skill_view_tool` 记录 view；`sandbox/tools.py` 的 `read_file` 路径记录 use；`skill_manage_tool` 写入时更新 usage。
+3. ~~`_default_record()` 默认 `created_by=”agent”`~~ → 已改为 `created_by=None`，仅在 create action 时由 origin 决定；`managed_by_curator` 仅对自动来源为 True。
+4. ~~`interval_hours: 0` 等危险组合~~ → `CuratorConfig` 已设 `ge=1`，`model_validator` 强制 `archive_after_days > stale_after_days`。
+5. ~~`asyncio.run()` 只能在线程中使用~~ → `SubagentExecutor` 已处理 running loop 检测，隔离到新线程执行。
+6. ~~后台状态无清理策略~~ → `_MAX_SEEN_TOOL_CALLS_PER_THREAD=2000`、`_THREAD_STATE_TTL_SECONDS=24h`，在 `after_agent` 时被动清理过期 thread state。
+
+当前剩余改进方向：
+
+1. 线程状态清理目前是被动的（仅在 after_agent 触发），长时间无新请求时不会主动 evict。
+2. 事件系统缺少 schema version 字段和 SQLite migration 机制。
+3. Curator dry-run/preview 能力未实现，是上线 Phase D 的前提。
+4. Memory 内容分类（声明性 vs 程序性）完全依赖 prompt，无确定性后验校验。
 
 ## 3. 设计原则
 
@@ -574,72 +581,72 @@ curator:
 
 ### Phase 0：契约与基线
 
-- [ ] 固化本文档和配置 schema。
-- [ ] 运行现有测试并记录基线。
-- [ ] 确认 `AGENTFLOW_HOME`、skills root、memory storage 的绝对路径解析。
-- [ ] 为后台任务统一定义 `origin`、`execution_context`、`thread_id`。
+- [x] 固化本文档和配置 schema。
+- [x] 运行现有测试并记录基线。
+- [x] 确认 `AGENTFLOW_HOME`、skills root、memory storage 的绝对路径解析。
+- [x] 为后台任务统一定义 `origin`、`execution_context`、`thread_id`。
 
-验收：配置可解析，所有现有测试基线可复现。
+验收：配置可解析，所有现有测试基线可复现。✅ 112 tests passing。
 
 ### Phase 1：Skill 写入与 provenance
 
-- [ ] 修复 usage 默认记录，不再无条件标记 `created_by=agent`。
-- [ ] 区分 foreground_user 和 background_review。
+- [x] 修复 usage 默认记录，不再无条件标记 `created_by=agent`。
+- [x] 区分 foreground_user 和 background_review。
 - [x] 确保 create/patch/write/remove 全部经过同一写入服务；delete 当前统一禁用。
-- [ ] 写入后生成 event，刷新 skill prompt cache。
-- [ ] 增加并发写锁、原子写、历史写入失败处理。
+- [x] 写入后生成 event，刷新 skill prompt cache。
+- [x] 增加并发写锁、原子写、历史写入失败处理。
 
-验收：前台技能不会被自动 Curator 管理；后台技能可以被 Curator 识别；失败不会产生半写入状态。
+验收：✅ 前台技能不会被自动 Curator 管理；后台技能可以被 Curator 识别；失败不会产生半写入状态。
 
 ### Phase 2：Skill progressive disclosure 与 usage 接线
 
-- [ ] `skills_list` 只返回 metadata。
-- [ ] `skill_view` 成功后记录 view。
-- [ ] 技能真正注入 prompt/显式调用后记录 use。
-- [ ] 排除 `.usage.json`、`.history`、`.archive` 等簿记路径。
+- [x] `skills_list` 只返回 metadata。
+- [x] `skill_view` 成功后记录 view。
+- [x] 技能真正注入 prompt/显式调用后记录 use（通过 sandbox read_file 路径）。
+- [x] 排除 `.usage.json`、`.history`、`.archive` 等簿记路径。
 - [ ] 增加路径判定的宿主路径和容器路径测试。
 
 验收：view/use 计数真实增长，Curator 根据真实活动而非创建时间判断。
 
 ### Phase 3：Background Review 稳定化
 
-- [ ] 统一 action JSON 容错解析。
-- [ ] 增加每 thread review_running 去重。
-- [ ] 增加 timeout、max actions、max messages。
-- [ ] 通过受限 service 执行动作，不暴露普通业务工具。
-- [ ] 所有写入带 background provenance。
-- [ ] review 失败不影响前台响应。
-- [ ] 评估升级到独立 review runtime/fork Agent。
+- [x] 统一 action JSON 容错解析。
+- [x] 增加每 thread review_running 去重。
+- [x] 增加 timeout、max actions、max messages。
+- [x] 通过受限 service 执行动作，不暴露普通业务工具。
+- [x] 所有写入带 background provenance。
+- [x] review 失败不影响前台响应。
+- [x] 升级到独立 review runtime（`review_agent/runtime.py`）。
 
-验收：后台 review 能够创建/patch/support file，父 checkpoint 不出现 review prompt 和 review response。
+验收：✅ 后台 review 能够创建/patch/support file，父 checkpoint 不出现 review prompt 和 review response。
 
 ### Phase 4：Memory 完整闭环
 
-- [ ] 检查 queue、updater、storage 的错误传播和日志。
+- [x] 检查 queue、updater、storage 的错误传播和日志。
 - [x] 接入退出时 discard pending；不在退出路径同步调用 Memory 模型。
-- [ ] 增加 memory write provenance。
-- [ ] 防止 review prompt、上传路径和工具中间结果进入 Memory。
-- [ ] 为 correction/reinforcement/explicit 信号补充测试。
+- [x] 增加 memory write provenance。
+- [x] 防止 review prompt、上传路径和工具中间结果进入 Memory。
+- [x] 为 correction/reinforcement/explicit 信号补充测试。
 
-验收：多轮对话、退出、reset、异常 provider 场景下 memory 不丢失、不污染。
+验收：✅ 多轮对话、退出、reset、异常 provider 场景下 memory 不丢失、不污染。
 
 ### Phase 5：Curator 生命周期（延期）
 
 - [x] 修复 interval=0 和 archive/stale 周期关系；Curator 仍保持关闭。
-- [ ] 增加首次运行 defer。
+- [x] 增加首次运行 defer（`should_run_curator` 首次只写时间戳，返回 False）。
+- [x] 实现 pinned 保护和 managed-by-curator 判断。
+- [x] 默认关闭 consolidation，手动/配置显式开启。
 - [ ] 实现 run 前备份、archive、restore。
-- [ ] 实现 pinned 保护和 managed-by-curator 判断。
-- [ ] 默认关闭 consolidation，手动/配置显式开启。
 - [ ] 清理 Timer、状态集合和并发任务。
 
 验收延期：archive、backup、restore、consolidation 和生命周期状态机不属于本轮完成范围。
 
 ### Phase 6：可观测性和运营
 
-- [ ] 记录 `review_started/review_completed/review_failed`。
-- [ ] 记录 `skill_created/skill_patched/skill_archived/skill_restored`。
-- [ ] 记录 memory update 成功/失败、耗时、模型名、token 使用量（不记录 secrets）。
-- [ ] 在现有 observability 看板展示 review 和 curator trace。
+- [x] 记录 `review_started/review_completed/review_failed`。
+- [x] 记录 `skill_created/skill_patched/skill_archived/skill_restored`。
+- [x] 记录 memory update 成功/失败、耗时、模型名、token 使用量（不记录 secrets）。
+- [x] 在现有 observability 看板展示 review 和 curator trace。
 - [ ] 增加后台任务状态查询能力。
 
 验收：能够从 thread、skill、event 反查一次自动变更的来源和结果。
@@ -852,7 +859,7 @@ make format
 | Phase E：可恢复治理 | 经确认的 archive/restore | 永久 delete、无备份治理 | 灰度运行、回滚演练、审计完整 |
 | Phase F：高级治理 | 显式配置的 consolidation | 默认自动合并、无 diff 合并 | 人工确认、最大动作数和失败补偿全部通过 |
 
-当前版本停留在 Phase B/C 的受限能力，并允许 Phase A 的只读观测；Phase D、E、F 暂不启用。
+当前版本已完成 Phase A/B/C 的全部能力；Phase D（Curator 预览/dry-run）、E、F 暂不启用。
 
 ---
 

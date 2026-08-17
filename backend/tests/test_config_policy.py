@@ -19,7 +19,8 @@ def test_default_config_matches_self_improvement_contract():
     assert config.skill_evolution.require_background_provenance is True
     assert config.background_review.enabled is True
     assert config.background_review.max_concurrent_reviews == 1
-    assert config.curator.enabled is False
+    assert config.curator.enabled is True
+    assert config.curator.consolidate is True
     assert config.session_search.enabled is True
 
 
