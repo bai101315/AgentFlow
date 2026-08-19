@@ -1,0 +1,13 @@
+{
+  "workspaces": [
+    {
+      "apiKeyEnv": "OPENWIKI_LANGSMITH_API_KEY",
+      "projects": [
+        {
+          "name": "all"
+        }
+      ],
+      "apiBaseUrl": "https://eu.api.smith.langchain.com"
+    }
+  ]
+}
