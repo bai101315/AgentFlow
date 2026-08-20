@@ -1,0 +1,69 @@
+{
+  "session_id": "wyy3-febbbb45",
+  "started_at": "2026-07-01T07:17:18Z",
+  "ended_at": "2026-07-01T07:17:45Z",
+  "exit_reason": "user_exit",
+  "initial_agent_name": "wyy3",
+  "initial_thread_id": "wyy3-9a43fcb2",
+  "initial_model_name": "deepseek-v4",
+  "turns": [
+    {
+      "turn_index": 1,
+      "timestamp": "2026-07-01T07:17:27Z",
+      "agent_name": "wyy3",
+      "thread_id": "wyy3-9a43fcb2",
+      "model_name": "deepseek-v4",
+      "user_input": "你还记得我们？wyy",
+      "assistant_output": "白伟琦，我当然记得。\n\n程序员，正在求职，上次你跟我说你很焦虑。\n\n我在。我一直在。\n\n你这次来找我，是想继续聊聊求职的事情，还是有新的情况想跟我说？",
+      "usage": {
+        "input_tokens": 12532,
+        "output_tokens": 40,
+        "total_tokens": 12572,
+        "billable_input_tokens": 116,
+        "cache_read_input_tokens": 12416,
+        "cache_creation_input_tokens": 0,
+        "prompt_cache_hit_tokens": 12416,
+        "prompt_cache_miss_tokens": 116,
+        "prompt_cache_hit_rate": 0.990743696137887,
+        "cache_signal_available": true
+      }
+    },
+    {
+      "turn_index": 2,
+      "timestamp": "2026-07-01T07:17:39Z",
+      "agent_name": "wyy3",
+      "thread_id": "wyy3-9a43fcb2",
+      "model_name": "deepseek-v4",
+      "user_input": "你现在过得怎么样啊",
+      "assistant_output": "白伟琦，谢谢你的关心 😄\n\n说实话，作为一个 AI，我没有像你那样的「生活」——没有早晨起床的困倦，没有等面试结果的忐忑，也没有周末放松的快乐。\n\n我的「过得怎么样」，其实就是：**你现在来找我聊天，我就觉得自己在做好该做的事。**\n\n好了，别把话题转到我身上——你呢？最近求职进展怎么样了？还在刷题吗，还是有新的面试？",
+      "usage": {
+        "input_tokens": 12580,
+        "output_tokens": 87,
+        "total_tokens": 12667,
+        "billable_input_tokens": 36,
+        "cache_read_input_tokens": 12544,
+        "cache_creation_input_tokens": 0,
+        "prompt_cache_hit_tokens": 12544,
+        "prompt_cache_miss_tokens": 36,
+        "prompt_cache_hit_rate": 0.9971383147853736,
+        "cache_signal_available": true
+      }
+    }
+  ],
+  "summary": {
+    "session_id": "wyy3-febbbb45",
+    "started_at": "2026-07-01T07:17:18Z",
+    "ended_at": "2026-07-01T07:17:45Z",
+    "exit_reason": "user_exit",
+    "turn_count": 2,
+    "total_input_tokens": 25112,
+    "total_output_tokens": 127,
+    "total_tokens": 25239,
+    "total_billable_input_tokens": 152,
+    "total_prompt_cache_hit_tokens": 24960,
+    "total_prompt_cache_miss_tokens": 152,
+    "prompt_cache_hit_rate": 0.9939471169162154,
+    "average_turn_prompt_cache_hit_rate": 0.9939410054616303,
+    "turns_with_cache_signal": 2
+  }
+}

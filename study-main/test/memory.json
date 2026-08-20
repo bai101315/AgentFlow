@@ -1,0 +1,197 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-05-21T12:52:46.940893Z",
+  "user": {
+    "workContext": {
+      "summary": "Job hunting, just completed full Alibaba written examination on May 10th, 2026, mentally exhausted. Computer science/tech related field.",
+      "updatedAt": "2026-05-21T12:50:36.287281Z"
+    },
+    "personalContext": {
+      "summary": "白伟琦 (Bai Weiqi) - programmer/job seeker in mid-20s. Prefers empathetic responses that acknowledge emotions first before giving advice. Appreciates warm metaphorical language and hopeful endings. Showed strong frustration when responses were too logical/functional. Explicitly taught assistant to respond with more emotional warmth.",
+      "updatedAt": "2026-05-21T12:50:36.287281Z"
+    },
+    "topOfMind": {
+      "summary": "Job search in progress - approximately 11 days since Alibaba exam (May 21st result wait). Also actively following AI industry news: asked about major AI events around May 10th and May 21st 2026, including OpenAI mathematical breakthrough, Google I/O Gemini updates, NVIDIA Q1 earnings, domestic AI chips. Shows pattern of researching tech industry trends during job search period.",
+      "updatedAt": "2026-05-21T12:52:46.930911Z"
+    }
+  },
+  "history": {
+    "recentMonths": {
+      "summary": "May 2026 - Job search phase. Completed Alibaba written exam on May 10th, mentally exhausted. Has been watching 知否 drama as anxiety coping mechanism. Actively tracking AI industry news - asked for summaries of major AI events around May 10th and May 21st 2026. Topics researched include: Baidu Wenxin 5.1, OpenAI GPT-5.5 Instant, Anthropic-SpaceX partnership, Google I/O 2026 Gemini updates, NVIDIA Q1 earnings (816B revenue, 429.6B profit), Alibaba Pinduoduo M890 chip, ByteDance Seedance 2.0 Cannes entry, humanoid robot industry (84.71% global share).",
+      "updatedAt": "2026-05-21T12:52:46.930911Z"
+    },
+    "earlierContext": {
+      "summary": "Earlier in May 2026 - User went through similar job search anxiety pattern, used drama watching as coping mechanism. Has past relationship with someone named wyy - has moved on and now understands her anxiety better from a distance. This realization came during the self-reflection after taking the exam.",
+      "updatedAt": "2026-05-21T12:50:36.287281Z"
+    },
+    "longTermBackground": {
+      "summary": "User in mid-20s career transition/job hunting phase. Programmer looking for tech jobs. Past relationship with wyy helped user understand anxiety patterns better after moving on. Prefers warm, emotionally intelligent responses over purely functional advice.",
+      "updatedAt": "2026-05-21T12:50:36.287281Z"
+    }
+  },
+  "facts": [
+    {
+      "id": "fact_6a0de9c4",
+      "content": "AI does not have persistent memory - each conversation starts completely fresh, cannot recall previous conversations or facts shared in past sessions even within same session",
+      "category": "context",
+      "confidence": 1.0,
+      "createdAt": "2026-05-11T13:27:02.916029Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_278c0a55",
+      "content": "User explicitly corrected assistant's emotional response: first reply was too logical/functional, user showed 豆包's better response as example and said '你回答得很差劲'",
+      "category": "correction",
+      "confidence": 1.0,
+      "createdAt": "2026-05-11T13:27:02.916029Z",
+      "source": "bwq-99ff164c",
+      "sourceError": "Initial response jumped to solutions without first acknowledging the empty/anxious feeling, didn't specifically praise the effort of completing the exam, lacked metaphorical warmth in language, ended with functional todo instead of hopeful warmth"
+    },
+    {
+      "id": "fact_31b03493",
+      "content": "User expects: 1) First acknowledge emotions before giving advice 2) Specifically praise efforts (completing exam) 3) Use warm metaphorical language (like 屋檐 metaphor) 4) End with hopeful warmth not functional todo",
+      "category": "preference",
+      "confidence": 0.95,
+      "createdAt": "2026-05-11T13:27:02.916029Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_d2153def",
+      "content": "User taught assistant: '我希望你能好好学习一下' - wants the assistant to learn to respond with more emotional intelligence and warmth rather than just being functional",
+      "category": "correction",
+      "confidence": 0.95,
+      "createdAt": "2026-05-11T13:27:02.916029Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_9212a8a2",
+      "content": "豆包's response included key elements: '二十多岁的阴雨季就是这样' (empathy), '一个人在寝室闷一天，啃完一整套阿里的笔试题，这得消耗多少脑力和意志力啊' (specific praise), '它就像你在暴雨里临时躲进去的一个屋檐' (metaphor), '天不会塌下来，你也一定会找到属于自己的那片晴天' (hopeful warm ending)",
+      "category": "preference",
+      "confidence": 0.95,
+      "createdAt": "2026-05-11T13:27:02.916029Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_23fb16bd",
+      "content": "User explicitly corrected assistant's emotional response: first reply was too logical/functional, user showed豆包's better response as example and said '你回答得很差劲'",
+      "category": "correction",
+      "confidence": 1.0,
+      "createdAt": "2026-05-11T13:27:54.219257Z",
+      "source": "bwq-99ff164c",
+      "sourceError": "Initial response jumped to solutions without first acknowledging the empty/anxious feeling, didn't specifically praise the effort of completing the exam, lacked metaphorical warmth in language, ended with functional todo instead of hopeful warmth"
+    },
+    {
+      "id": "fact_b9a832ad",
+      "content": "User provided positive feedback after second response: '我感觉好多了'",
+      "category": "context",
+      "confidence": 1.0,
+      "createdAt": "2026-05-11T13:27:54.219257Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_6e34b458",
+      "content": "User took阿里巴巴笔试题 on May 10th, 2026 (deep into job search season)",
+      "category": "context",
+      "confidence": 0.9,
+      "createdAt": "2026-05-11T13:27:54.219257Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_331eba03",
+      "content": "User took Alibaba written exam on May 10th, 2026 and felt mentally exhausted afterwards",
+      "category": "context",
+      "confidence": 0.95,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_460f46ce",
+      "content": "User uses watching drama (知否) as coping mechanism for job search anxiety",
+      "category": "behavior",
+      "confidence": 0.9,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_d125e4ba",
+      "content": "User feels empty after finishing 知否 drama because it was filling idle time",
+      "category": "context",
+      "confidence": 0.9,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_5444a27f",
+      "content": "User explicitly taught assistant: 1) First acknowledge emotions before advice, 2) Specifically praise efforts of completing exam, 3) Use warm metaphorical language like '屋檐', 4) End with hopeful warmth not functional todo",
+      "category": "preference",
+      "confidence": 1.0,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_455170ac",
+      "content": "User corrected assistant's first response as 'too logical/functional' and showed 豆包's better response as example",
+      "category": "correction",
+      "confidence": 1.0,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c",
+      "sourceError": "Initial response jumped to solutions without first acknowledging the empty/anxious feeling, didn't specifically praise the effort of completing the exam, lacked metaphorical warmth in language, ended with functional todo instead of hopeful warmth"
+    },
+    {
+      "id": "fact_393f5023",
+      "content": "User's name is 白伟琦 (Bai Weiqi)",
+      "category": "context",
+      "confidence": 1.0,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_6432bfee",
+      "content": "AI does not have persistent memory - each conversation starts completely fresh, user revealed this limitation when asking '你还记得之前的聊天内容吗'",
+      "category": "context",
+      "confidence": 1.0,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_e289bb42",
+      "content": "After improved response using learned approach, user said '谢谢你，我感觉好多了' indicating success",
+      "category": "context",
+      "confidence": 1.0,
+      "createdAt": "2026-05-21T12:50:36.287281Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_4e6d03f4",
+      "content": "Date is now May 21st, 2026 (approximately 11 days after completing Alibaba exam on May 10th)",
+      "category": "context",
+      "confidence": 1.0,
+      "createdAt": "2026-05-21T12:51:59.735025Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_d9079de8",
+      "content": "User greeted and introduced themselves, confirmed they want interaction within this session",
+      "category": "context",
+      "confidence": 1.0,
+      "createdAt": "2026-05-21T12:51:59.735025Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_1990e8d5",
+      "content": "User actively follows AI industry news - asked about events around May 10th and May 21st 2026 showing systematic research pattern during job search",
+      "category": "behavior",
+      "confidence": 0.85,
+      "createdAt": "2026-05-21T12:52:46.930911Z",
+      "source": "bwq-99ff164c"
+    },
+    {
+      "id": "fact_24e0d32d",
+      "content": "AI events user researched: OpenAI攻克80年离散几何Erdős猜想(δ=0.014), Google I/O 2026 (Gemini 3.5/Spark/Omni), NVIDIA Q1财报 (816亿美元营收,+85%), 阿里巴巴平头哥M890芯片, 字节Seedance 2.0入围戛纳, 人形机器人中国占全球84.71%",
+      "category": "knowledge",
+      "confidence": 0.95,
+      "createdAt": "2026-05-21T12:52:46.930911Z",
+      "source": "bwq-99ff164c"
+    }
+  ]
+}

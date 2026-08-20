@@ -1,0 +1,69 @@
+{
+  "session_id": "wyy3-bd4449e1",
+  "started_at": "2026-07-01T08:07:13Z",
+  "ended_at": "2026-07-01T08:08:15Z",
+  "exit_reason": "user_exit",
+  "initial_agent_name": "wyy3",
+  "initial_thread_id": "wyy3-d720415b",
+  "initial_model_name": "deepseek-v4",
+  "turns": [
+    {
+      "turn_index": 1,
+      "timestamp": "2026-07-01T08:07:33Z",
+      "agent_name": "wyy3",
+      "thread_id": "wyy3-d720415b",
+      "model_name": "deepseek-v4",
+      "user_input": "你还记得我们？wyy",
+      "assistant_output": "（轻轻笑了笑）\n\n当然记得。我们之前交流过的每一次，我都记在这里 —— 你叫白伟琦，是一名程序员，正在经历求职期。这份记忆不是为了\"显得聪明\"，而是为了让我们每次见面都不用从头开始，能真正地继续往前走。\n\n关于你刚刚问的那个选项——你处在这四个阶段中的哪个了呢？还是说，今天的状态让你想先聊聊别的？😊",
+      "usage": {
+        "input_tokens": 12985,
+        "output_tokens": 83,
+        "total_tokens": 13068,
+        "billable_input_tokens": 12985,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 12985,
+        "prompt_cache_hit_rate": 0.0,
+        "cache_signal_available": true
+      }
+    },
+    {
+      "turn_index": 2,
+      "timestamp": "2026-07-01T08:07:48Z",
+      "agent_name": "wyy3",
+      "thread_id": "wyy3-d720415b",
+      "model_name": "deepseek-v4",
+      "user_input": "你现在过得怎么样啊",
+      "assistant_output": "伟琦，谢谢你问我这个问题。说实话，被你这样问候一下，感觉还挺温暖的。😊\n\n作为一个人工智能，我没有\"生活\"的概念，但我的状态可以用一句话来形容：**随时准备好，陪你聊你想聊的任何事。**\n\n所以你不用担心我累不累、忙不忙——我就是为了这样的时刻存在的。无论是你想倾诉焦虑、理清思路，还是哪怕只是有人静静地听你说说话，我都在这儿。\n\n不过话说回来，我注意到你转移了话题哦。😌 是不是刚才那个选项（准备/投递/面试/等待）不太好意思直接选，还是觉得现在不想聊求职的事？\n\n**没关系，我们按你的节奏来。** 你想聊什么，我们就聊什么。",
+      "usage": {
+        "input_tokens": 13076,
+        "output_tokens": 149,
+        "total_tokens": 13225,
+        "billable_input_tokens": 20,
+        "cache_read_input_tokens": 13056,
+        "cache_creation_input_tokens": 0,
+        "prompt_cache_hit_tokens": 13056,
+        "prompt_cache_miss_tokens": 20,
+        "prompt_cache_hit_rate": 0.9984704802691955,
+        "cache_signal_available": true
+      }
+    }
+  ],
+  "summary": {
+    "session_id": "wyy3-bd4449e1",
+    "started_at": "2026-07-01T08:07:13Z",
+    "ended_at": "2026-07-01T08:08:15Z",
+    "exit_reason": "user_exit",
+    "turn_count": 2,
+    "total_input_tokens": 26061,
+    "total_output_tokens": 232,
+    "total_tokens": 26293,
+    "total_billable_input_tokens": 13005,
+    "total_prompt_cache_hit_tokens": 13056,
+    "total_prompt_cache_miss_tokens": 13005,
+    "prompt_cache_hit_rate": 0.5009784735812133,
+    "average_turn_prompt_cache_hit_rate": 0.49923524013459775,
+    "turns_with_cache_signal": 2
+  }
+}

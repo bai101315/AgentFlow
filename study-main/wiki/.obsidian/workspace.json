@@ -1,0 +1,199 @@
+{
+  "main": {
+    "id": "70b6afcc9f6e01f8",
+    "type": "split",
+    "children": [
+      {
+        "id": "701d2ebfeced61ba",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b048552e961a89b8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "log.md",
+                "mode": "preview",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "log"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "a1c1f1ca1909590f",
+    "type": "split",
+    "children": [
+      {
+        "id": "74a91f58c4edf0b0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "8c970390f650abdc",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "023bb920d04b706b",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "tag:core-class",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "f0d2c8ff2aaa1782",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "2940b820e58aeb6a",
+    "type": "split",
+    "children": [
+      {
+        "id": "374deab77e08f8c7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f40ecc2aab253549",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "entities/aiagent.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "aiagent 的反向链接列表"
+            }
+          },
+          {
+            "id": "d38fb466420a4279",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "log.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "log 的出链列表"
+            }
+          },
+          {
+            "id": "40ac62a85a1b1060",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "1ceaa8bbcc08d9b1",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "695db652e0a16ba3",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "entities/aiagent.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "aiagent 的大纲"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "b048552e961a89b8",
+  "lastOpenFiles": [
+    "index.md",
+    "context-compression.md",
+    "SCHEMA.md",
+    "concepts/conversation-loop.md",
+    "concepts/trajectory.md",
+    "entities/aiagent.md",
+    "log.md",
+    "concepts/llm-wiki-usage.md",
+    "raw/articles/hermesagent-org-llm-wiki-zh.md",
+    "concepts/guardrail-system.md"
+  ]
+}
